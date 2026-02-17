@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geo-NLP Intelligence Platform Infographic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Slate 900 */
+            color: #e2e8f0; /* Slate 200 */
+        }
+
+        /* Chart Container Styling - MANDATORY */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 100%; /* Adapts to grid column */
+            height: 300px;
+            max-height: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3b82f6; 
+            border-radius: 4px;
+        }
+
+        /* Connector Lines for Diagram */
+        .connector-line {
+            width: 2px;
+            background-color: #6366f1;
+            margin: 0 auto;
+        }
+    </style>
+    <!-- 
+        Palette: Vibrant Cyber Tech
+        Background: #0f172a (Deep Slate)
+        Card Bg: #1e293b (Slate 800)
+        Primary: #3b82f6 (Bright Blue)
+        Secondary: #8b5cf6 (Electric Purple)
+        Accent: #06b6d4 (Neon Cyan)
+        Success: #22c55e (Green)
+    -->
+</head>
+<body class="antialiased selection:bg-cyan-500 selection:text-white">
+
+    <!-- Header Section -->
+    <header class="w-full py-12 px-4 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-700">
+        <div class="max-w-7xl mx-auto text-center">
+            <h1 class="text-4xl md:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 mb-4 tracking-tight">
+                GEO-NLP INTELLIGENCE
+            </h1>
+            <p class="text-xl md:text-2xl text-slate-400 max-w-3xl mx-auto">
+                A modular infrastructure transforming Natural Language into Geospatial SQL using Vanna AI 2.0 & Pydantic AI.
+            </p>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-12 gap-8">
+
+        <!-- Introduction -->
+        <section class="md:col-span-12 bg-slate-800 rounded-xl shadow-lg p-8 border border-slate-700">
+            <h2 class="text-2xl font-bold text-white mb-4 border-l-4 border-cyan-500 pl-4">Executive Summary</h2>
+            <p class="text-slate-300 leading-relaxed mb-6">
+                This platform implements a robust pipeline to convert user questions into precise SQL queries for PostgreSQL/PostGIS. It leverages a three-module architecture: a <strong>Core Intelligence API</strong> (Python/Vanna), an <strong>Immersive Frontend</strong> (React/CopilotKit), and a <strong>Management Dashboard</strong>. The system is designed to handle complex geospatial operations, context retention, and continuous self-improvement through feedback loops.
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
+                    <span class="text-cyan-400 text-3xl font-bold block mb-1">11</span>
+                    <span class="text-sm text-slate-400 uppercase tracking-wider font-semibold">Pipeline Phases</span>
+                </div>
+                <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
+                    <span class="text-purple-400 text-3xl font-bold block mb-1">3</span>
+                    <span class="text-sm text-slate-400 uppercase tracking-wider font-semibold">Integrated Modules</span>
+                </div>
+                <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
+                    <span class="text-green-400 text-3xl font-bold block mb-1">2.0</span>
+                    <span class="text-sm text-slate-400 uppercase tracking-wider font-semibold">Vanna AI Version</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Architecture Diagram Section -->
+        <section class="md:col-span-12">
+            <h2 class="text-3xl font-bold text-white mb-8 text-center">System Architecture</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-start relative">
+                
+                <!-- Module 2 -->
+                <div class="bg-slate-800 rounded-xl p-6 border-t-4 border-cyan-500 shadow-xl relative z-10 h-full flex flex-col">
+                    <div class="mb-4">
+                        <h3 class="text-xl font-bold text-white">Module 2: Immersive UI</h3>
+                        <p class="text-cyan-400 text-sm font-mono">React + CopilotKit + Leaflet</p>
+                    </div>
+                    <ul class="text-slate-300 space-y-2 mb-4 flex-grow">
+                        <li class="flex items-start"><span class="text-cyan-500 mr-2">➤</span> Chat-over-Map Interface</li>
+                        <li class="flex items-start"><span class="text-cyan-500 mr-2">➤</span> Homologation Mode</li>
+                        <li class="flex items-start"><span class="text-cyan-500 mr-2">➤</span> Real-time WMS Rendering</li>
+                    </ul>
+                    <div class="bg-slate-900 p-3 rounded text-center text-xs text-slate-400 font-mono">
+                        Output: Natural Language & Actions
+                    </div>
+                </div>
+
+                <!-- Connector Mobile (Hidden on Desktop) -->
+                <div class="md:hidden flex justify-center text-slate-600 font-bold text-2xl">↓</div>
+
+                <!-- Module 1 -->
+                <div class="bg-slate-800 rounded-xl p-6 border-t-4 border-purple-500 shadow-xl relative z-10 transform md:-translate-y-4 h-full flex flex-col">
+                    <div class="mb-4">
+                        <h3 class="text-xl font-bold text-white">Module 1: Core Intelligence</h3>
+                        <p class="text-purple-400 text-sm font-mono">Python + Vanna AI + Pydantic</p>
+                    </div>
+                    <ul class="text-slate-300 space-y-2 mb-4 flex-grow">
+                        <li class="flex items-start"><span class="text-purple-500 mr-2">➤</span> Context & RAG Orchestration</li>
+                        <li class="flex items-start"><span class="text-purple-500 mr-2">➤</span> Safety & Cost Agents</li>
+                        <li class="flex items-start"><span class="text-purple-500 mr-2">➤</span> Geo-Routing Logic</li>
+                    </ul>
+                    <div class="bg-slate-900 p-3 rounded text-center text-xs text-slate-400 font-mono">
+                        Output: SQL / Data / GeoJSON
+                    </div>
+                </div>
+
+                <!-- Connector Mobile (Hidden on Desktop) -->
+                <div class="md:hidden flex justify-center text-slate-600 font-bold text-2xl">↓</div>
+
+                <!-- Module 3 -->
+                <div class="bg-slate-800 rounded-xl p-6 border-t-4 border-green-500 shadow-xl relative z-10 h-full flex flex-col">
+                    <div class="mb-4">
+                        <h3 class="text-xl font-bold text-white">Module 3: Management</h3>
+                        <p class="text-green-400 text-sm font-mono">Admin Dashboard</p>
+                    </div>
+                    <ul class="text-slate-300 space-y-2 mb-4 flex-grow">
+                        <li class="flex items-start"><span class="text-green-500 mr-2">➤</span> Training Data Editor</li>
+                        <li class="flex items-start"><span class="text-green-500 mr-2">➤</span> Database Connection Mgr</li>
+                        <li class="flex items-start"><span class="text-green-500 mr-2">➤</span> Dictionary Enrichment</li>
+                    </ul>
+                    <div class="bg-slate-900 p-3 rounded text-center text-xs text-slate-400 font-mono">
+                        Output: Configuration & Rules
+                    </div>
+                </div>
+
+            </div>
+            <!-- Visual Connector Desktop -->
+            <div class="hidden md:flex justify-between max-w-4xl mx-auto -mt-32 relative z-0 opacity-20">
+                 <!-- Just aesthetic spacing, structured flow is implied by grid -->
+            </div>
+        </section>
+
+        <!-- Chart Section: Pipeline Latency -->
+        <section class="md:col-span-8 bg-slate-800 rounded-xl shadow-lg p-6 border border-slate-700">
+            <h3 class="text-xl font-bold text-white mb-2">Module 1: Pipeline Execution Latency Estimate</h3>
+            <p class="text-sm text-slate-400 mb-6">Estimated time budget per phase in the Core Intelligence API. Vanna AI handles the heavy lifting of RAG and SQL generation, while Pydantic Agents ensure safety and context.</p>
+            <div class="chart-container">
+                <canvas id="pipelineChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Chart Section: Module Capabilities -->
+        <section class="md:col-span-4 bg-slate-800 rounded-xl shadow-lg p-6 border border-slate-700">
+            <h3 class="text-xl font-bold text-white mb-2">Capabilities Distribution</h3>
+            <p class="text-sm text-slate-400 mb-6">Comparing the functional focus of each module.</p>
+            <div class="chart-container">
+                <canvas id="radarChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Detailed Process Flow -->
+        <section class="md:col-span-12">
+            <h2 class="text-3xl font-bold text-white mb-8 border-l-4 border-purple-500 pl-4">The Intelligent Pipeline (Module 1)</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                
+                <!-- Step 1 -->
+                <div class="bg-slate-800 p-5 rounded-lg border border-slate-700 hover:border-cyan-500 transition-colors">
+                    <div class="text-cyan-400 font-bold text-lg mb-2">01. Context Agent</div>
+                    <p class="text-slate-300 text-sm">Pydantic AI reformulates the user query using chat history to create a standalone question.</p>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="bg-slate-800 p-5 rounded-lg border border-slate-700 hover:border-cyan-500 transition-colors">
+                    <div class="text-cyan-400 font-bold text-lg mb-2">02. RAG Retrieval</div>
+                    <p class="text-slate-300 text-sm">Vanna AI searches the Vector DB for similar SQL examples, DDL, and documentation.</p>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="bg-slate-800 p-5 rounded-lg border border-slate-700 hover:border-cyan-500 transition-colors">
+                    <div class="text-cyan-400 font-bold text-lg mb-2">03. Prompt Build</div>
+                    <p class="text-slate-300 text-sm">Constructs a system prompt injecting Postgres rules, spatial logic, and retrieved context.</p>
+                </div>
+
+                <!-- Step 4 -->
+                <div class="bg-slate-800 p-5 rounded-lg border border-slate-700 hover:border-cyan-500 transition-colors">
+                    <div class="text-cyan-400 font-bold text-lg mb-2">04. LLM Generation</div>
+                    <p class="text-slate-300 text-sm">The Large Language Model generates the raw SQL query based on the enriched prompt.</p>
+                </div>
+
+                <!-- Step 5 -->
+                <div class="bg-slate-800 p-5 rounded-lg border border-slate-700 hover:border-purple-500 transition-colors">
+                    <div class="text-purple-400 font-bold text-lg mb-2">05. Safety Agent</div>
+                    <p class="text-slate-300 text-sm">Validates syntax and blocks forbidden commands (DROP, DELETE, UPDATE) using Pydantic.</p>
+                </div>
+
+                <!-- Step 6 -->
+                <div class="bg-slate-800 p-5 rounded-lg border border-slate-700 hover:border-purple-500 transition-colors">
+                    <div class="text-purple-400 font-bold text-lg mb-2">06. Cost Estimator</div>
+                    <p class="text-slate-300 text-sm">Runs `EXPLAIN` on Postgres to predict processing time. Aborts if too expensive.</p>
+                </div>
+
+                <!-- Step 7 -->
+                <div class="bg-slate-800 p-5 rounded-lg border border-slate-700 hover:border-purple-500 transition-colors">
+                    <div class="text-purple-400 font-bold text-lg mb-2">07. Execution</div>
+                    <p class="text-slate-300 text-sm">Runs the sanitized SQL against the PostGIS database to fetch the dataframe.</p>
+                </div>
+
+                 <!-- Step 8 -->
+                 <div class="bg-slate-800 p-5 rounded-lg border border-slate-700 hover:border-green-500 transition-colors">
+                    <div class="text-green-400 font-bold text-lg mb-2">08. Geo-Routing</div>
+                    <p class="text-slate-300 text-sm">Decides between returning lightweight GeoJSON or generating a WMS Layer URL.</p>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Plotly Visualization: Knowledge Base -->
+        <section class="md:col-span-12 bg-slate-800 rounded-xl shadow-lg p-6 border border-slate-700">
+            <h3 class="text-xl font-bold text-white mb-2">Training Data Vector Space</h3>
+            <p class="text-sm text-slate-400 mb-6">A 3D representation of how Vanna AI stores training data (DDL, Questions, SQL) in the vector database to retrieve context for RAG.</p>
+            <div class="chart-container h-[500px]">
+                <div id="vectorPlot" style="width: 100%; height: 100%;"></div>
+            </div>
+        </section>
+
+        <!-- Tech Stack & Features -->
+        <section class="md:col-span-12">
+            <h2 class="text-3xl font-bold text-white mb-8 border-l-4 border-green-500 pl-4">Key Technologies & Features</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                <!-- Feature 1 -->
+                <div class="bg-slate-900 p-6 rounded-xl border border-slate-800">
+                    <h4 class="text-lg font-bold text-cyan-400 mb-2">Vanna AI 2.0</h4>
+                    <p class="text-slate-400 text-sm">The core engine providing RAG capabilities, training APIs, and prompt management. Treated as a library within Python.</p>
+                </div>
+
+                <!-- Feature 2 -->
+                <div class="bg-slate-900 p-6 rounded-xl border border-slate-800">
+                    <h4 class="text-lg font-bold text-cyan-400 mb-2">Pydantic AI</h4>
+                    <p class="text-slate-400 text-sm">Orchestrates the agents. Ensures structured outputs and validates logic flow between phases.</p>
+                </div>
+
+                <!-- Feature 3 -->
+                <div class="bg-slate-900 p-6 rounded-xl border border-slate-800">
+                    <h4 class="text-lg font-bold text-cyan-400 mb-2">CopilotKit</h4>
+                    <p class="text-slate-400 text-sm">Powers the frontend AI. Manages chat state and triggers actions like `update_map_view`.</p>
+                </div>
+
+                <!-- Feature 4 -->
+                <div class="bg-slate-900 p-6 rounded-xl border border-slate-800">
+                    <h4 class="text-lg font-bold text-green-400 mb-2">PostGIS + Geoserver</h4>
+                    <p class="text-slate-400 text-sm">Handles spatial data. Geoserver provides WMS styling for heavy datasets (1000+ features).</p>
+                </div>
+
+                <!-- Feature 5 -->
+                <div class="bg-slate-900 p-6 rounded-xl border border-slate-800">
+                    <h4 class="text-lg font-bold text-green-400 mb-2">Homologation Mode</h4>
+                    <p class="text-slate-400 text-sm">Enabled via `?test=true`. Shows generated SQL and allows feedback to retrain the model immediately.</p>
+                </div>
+
+                <!-- Feature 6 -->
+                <div class="bg-slate-900 p-6 rounded-xl border border-slate-800">
+                    <h4 class="text-lg font-bold text-green-400 mb-2">Auto-Learning</h4>
+                    <p class="text-slate-400 text-sm">Approved answers are automatically fed back into Vanna's training loop to improve future accuracy.</p>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full py-8 bg-slate-900 border-t border-slate-800 text-center">
+        <p class="text-slate-500 text-sm">Generated for Geo-NLP Intelligence Project Planning</p>
+    </footer>
+
+    <!-- JavaScript for Charts -->
+    <script>
+        // --- DATA PREPARATION ---
+        
+        // Label wrapping helper function (Strict Requirement)
+        function formatLabels(labels, maxChar) {
+            return labels.map(label => {
+                if (label.length <= maxChar) return label;
+                const words = label.split(' ');
+                const lines = [];
+                let currentLine = words[0];
+
+                for (let i = 1; i < words.length; i++) {
+                    if ((currentLine + " " + words[i]).length < maxChar) {
+                        currentLine += " " + words[i];
+                    } else {
+                        lines.push(currentLine);
+                        currentLine = words[i];
+                    }
+                }
+                lines.push(currentLine);
+                return lines;
+            });
+        }
+
+        // --- CHART.JS CONFIGURATION ---
+        Chart.defaults.color = '#94a3b8'; // Slate 400
+        Chart.defaults.font.family = 'Inter';
+
+        const tooltipPlugin = {
+            tooltip: {
+                callbacks: {
+                    title: function(tooltipItems) {
+                        const item = tooltipItems[0];
+                        let label = item.chart.data.labels[item.dataIndex];
+                        if (Array.isArray(label)) {
+                            return label.join(' ');
+                        } else {
+                            return label;
+                        }
+                    }
+                }
+            }
+        };
+
+        // 1. Pipeline Latency Chart (Bar)
+        const ctxPipeline = document.getElementById('pipelineChart').getContext('2d');
+        const rawPipelineLabels = ["Context Analysis (Agent)", "RAG Retrieval (Vanna)", "LLM SQL Gen (Model)", "Safety Check (Pydantic)", "Cost Estimate (DB)", "Query Execution (DB)"];
+        const formattedPipelineLabels = formatLabels(rawPipelineLabels, 16);
+
+        new Chart(ctxPipeline, {
+            type: 'bar',
+            data: {
+                labels: formattedPipelineLabels,
+                datasets: [{
+                    label: 'Estimated Latency (ms)',
+                    data: [150, 200, 1200, 100, 50, 400],
+                    backgroundColor: [
+                        '#06b6d4', // Cyan
+                        '#3b82f6', // Blue
+                        '#8b5cf6', // Purple
+                        '#d946ef', // Fuchsia
+                        '#f43f5e', // Pink
+                        '#22c55e'  // Green
+                    ],
+                    borderRadius: 6,
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y', // Horizontal Bar
+                plugins: {
+                    legend: { display: false },
+                    tooltip: tooltipPlugin.tooltip
+                },
+                scales: {
+                    x: {
+                        grid: { color: '#334155' },
+                        ticks: { color: '#cbd5e1' }
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: { color: '#e2e8f0', font: { weight: '600' } }
+                    }
+                }
+            }
+        });
+
+        // 2. Capabilities Radar Chart
+        const ctxRadar = document.getElementById('radarChart').getContext('2d');
+        const rawRadarLabels = ["Natural Language Processing", "Geospatial Rendering", "Data Management", "Security Logic", "User Interaction"];
+        const formattedRadarLabels = formatLabels(rawRadarLabels, 16);
+
+        new Chart(ctxRadar, {
+            type: 'radar',
+            data: {
+                labels: formattedRadarLabels,
+                datasets: [
+                    {
+                        label: 'Module 1 (Core)',
+                        data: [95, 20, 40, 90, 10],
+                        borderColor: '#8b5cf6',
+                        backgroundColor: 'rgba(139, 92, 246, 0.2)',
+                        pointBackgroundColor: '#8b5cf6'
+                    },
+                    {
+                        label: 'Module 2 (UI)',
+                        data: [10, 100, 10, 20, 100],
+                        borderColor: '#06b6d4',
+                        backgroundColor: 'rgba(6, 182, 212, 0.2)',
+                        pointBackgroundColor: '#06b6d4'
+                    },
+                    {
+                        label: 'Module 3 (Admin)',
+                        data: [0, 0, 100, 60, 40],
+                        borderColor: '#22c55e',
+                        backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                        pointBackgroundColor: '#22c55e'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: '#e2e8f0' } },
+                    tooltip: tooltipPlugin.tooltip
+                },
+                scales: {
+                    r: {
+                        grid: { color: '#334155' },
+                        angleLines: { color: '#475569' },
+                        pointLabels: { color: '#cbd5e1', font: { size: 11 } },
+                        suggestedMin: 0,
+                        suggestedMax: 100
+                    }
+                }
+            }
+        });
+
+        // --- PLOTLY.JS CONFIGURATION (Canvas Mode) ---
+        // 3. Vector Space 3D Scatter
+        const vectorData = [
+            {
+                x: Array.from({length: 50}, () => Math.random() * 10),
+                y: Array.from({length: 50}, () => Math.random() * 10),
+                z: Array.from({length: 50}, () => Math.random() * 10),
+                mode: 'markers',
+                type: 'scatter3d',
+                name: 'DDL Schemas',
+                marker: { size: 4, color: '#06b6d4', opacity: 0.8 }
+            },
+            {
+                x: Array.from({length: 50}, () => Math.random() * 10),
+                y: Array.from({length: 50}, () => Math.random() * 10),
+                z: Array.from({length: 50}, () => Math.random() * 10),
+                mode: 'markers',
+                type: 'scatter3d',
+                name: 'SQL Questions',
+                marker: { size: 4, color: '#8b5cf6', opacity: 0.8 }
+            },
+            {
+                x: Array.from({length: 20}, () => Math.random() * 10),
+                y: Array.from({length: 20}, () => Math.random() * 10),
+                z: Array.from({length: 20}, () => Math.random() * 10),
+                mode: 'markers',
+                type: 'scatter3d',
+                name: 'Geo Terms',
+                marker: { size: 6, color: '#22c55e', opacity: 0.9, symbol: 'diamond' }
+            }
+        ];
+
+        const vectorLayout = {
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            margin: { l: 0, r: 0, b: 0, t: 0 },
+            showlegend: true,
+            legend: { font: { color: '#cbd5e1' }, orientation: 'h', y: 0.1 },
+            scene: {
+                xaxis: { title: '', showgrid: true, gridcolor: '#334155', zeroline: false, showticklabels: false },
+                yaxis: { title: '', showgrid: true, gridcolor: '#334155', zeroline: false, showticklabels: false },
+                zaxis: { title: '', showgrid: true, gridcolor: '#334155', zeroline: false, showticklabels: false },
+                bgcolor: 'rgba(0,0,0,0)'
+            }
+        };
+        
+        // Force WebGL rendering for Plotly
+        Plotly.newPlot('vectorPlot', vectorData, vectorLayout, {responsive: true, displayModeBar: false});
+
+    </script>
+</body>
+</html>
