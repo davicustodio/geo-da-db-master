@@ -1,0 +1,3 @@
+[submodule "api-geo-nlp"]
+	path = api-geo-nlp
+	url = https://gitlab.cnpm.embrapa.br/davi/api-geo-nlp.git
