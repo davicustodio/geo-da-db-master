@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geo-NLP Intelligence Platform | Interactive Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* Slate 50 */
+            color: #334155; /* Slate 700 */
+        }
+
+        /* Chart Container Styling - MANDATORY */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 100%;
+            height: 300px;
+            max-height: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Interactive Element Styles */
+        .nav-item.active {
+            background-color: #e0f2fe; /* Sky 100 */
+            color: #0284c7; /* Sky 600 */
+            border-right: 4px solid #0284c7;
+        }
+
+        .pipeline-step {
+            transition: all 0.3s ease;
+        }
+        .pipeline-step.active {
+            background-color: #0f172a; /* Slate 900 */
+            color: white;
+            transform: scale(1.05);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .module-card {
+            transition: transform 0.2s;
+        }
+        .module-card:hover {
+            transform: translateY(-4px);
+        }
+
+        /* Hide sections by default */
+        .content-section {
+            display: none;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        .content-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+    <!-- Chosen Palette: Clean Tech SaaS (Light Mode) -->
+    <!-- Application Structure Plan: Dashboard Layout. 
+         1. Sidebar Navigation: For easy switching between conceptual areas (Overview, Pipeline, Analytics, Specs).
+         2. Overview Section: High-level synthesis, Architecture diagram using CSS Grid (Goal: Organize).
+         3. Pipeline Simulator: Interactive step-by-step walkthrough of the 11 phases (Goal: Change/Process). User clicks to advance, fostering understanding of the complex logic.
+         4. Analytics Hub: Centralized location for all data visualizations (Latency, Capabilities, Vector Space).
+         5. Module Specs: Tabbed interface to drill down into technical details without cluttering the main view.
+    -->
+    <!-- Visualization & Content Choices:
+         1. KPI Cards (Overview) -> Goal: Inform -> Simple stat cards -> Quick context.
+         2. Interactive Architecture (Overview) -> Goal: Organize -> CSS Grid/Flex cards -> No SVG used.
+         3. Pipeline Flow (Pipeline) -> Goal: Change -> JS-driven stepper -> Explains the Vanna/Pydantic workflow interactively.
+         4. Latency Chart (Analytics) -> Goal: Compare -> Chart.js Horizontal Bar -> Visualizes time budget per phase.
+         5. Capabilities Radar (Analytics) -> Goal: Relationships -> Chart.js Radar -> Compares module strengths.
+         6. Vector Space (Analytics) -> Goal: Relationships -> Plotly 3D Scatter (Canvas) -> Shows complexity of RAG data.
+         CONFIRMATION: NO SVG graphics used. NO Mermaid JS used.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+</head>
+<body class="flex h-screen overflow-hidden">
+
+    <!-- Sidebar Navigation -->
+    <aside class="w-64 bg-white border-r border-slate-200 flex flex-col shadow-sm z-20 hidden md:flex">
+        <div class="p-6 border-b border-slate-100">
+            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Geo-NLP <span class="text-sky-600">Intel</span></h1>
+            <p class="text-xs text-slate-500 mt-1">Interactive Project Plan</p>
+        </div>
+        <nav class="flex-1 overflow-y-auto py-4">
+            <ul class="space-y-1">
+                <li>
+                    <button onclick="showSection('dashboard')" class="nav-item active w-full text-left px-6 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors flex items-center">
+                        <span class="mr-3">📊</span> Executive Dashboard
+                    </button>
+                </li>
+                <li>
+                    <button onclick="showSection('pipeline')" class="nav-item w-full text-left px-6 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors flex items-center">
+                        <span class="mr-3">🔄</span> Pipeline Simulator
+                    </button>
+                </li>
+                <li>
+                    <button onclick="showSection('analytics')" class="nav-item w-full text-left px-6 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors flex items-center">
+                        <span class="mr-3">📈</span> Performance Analytics
+                    </button>
+                </li>
+                <li>
+                    <button onclick="showSection('modules')" class="nav-item w-full text-left px-6 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors flex items-center">
+                        <span class="mr-3">📦</span> Module Specs
+                    </button>
+                </li>
+            </ul>
+        </nav>
+        <div class="p-4 border-t border-slate-100 bg-slate-50">
+            <div class="text-xs text-slate-500">
+                <p class="font-semibold">Project Status:</p>
+                <p class="text-green-600">● Planning Complete</p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Mobile Header -->
+    <div class="md:hidden fixed top-0 left-0 w-full bg-white border-b border-slate-200 z-30 px-4 py-3 flex justify-between items-center">
+        <h1 class="text-lg font-bold text-slate-800">Geo-NLP Intel</h1>
+        <select onchange="showSection(this.value)" class="bg-slate-100 border-none rounded text-sm p-2 text-slate-700">
+            <option value="dashboard">Dashboard</option>
+            <option value="pipeline">Pipeline</option>
+            <option value="analytics">Analytics</option>
+            <option value="modules">Specs</option>
+        </select>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto bg-slate-50 p-4 md:p-8 mt-12 md:mt-0 relative">
+
+        <!-- SECTION 1: DASHBOARD -->
+        <section id="dashboard" class="content-section active max-w-7xl mx-auto">
+            
+            <header class="mb-8">
+                <h2 class="text-3xl font-bold text-slate-800 mb-2">Executive Overview</h2>
+                <p class="text-slate-600 max-w-3xl">
+                    The Geo-NLP Intelligence Platform is a modular infrastructure designed to transform natural language questions into complex geospatial SQL queries. 
+                    Leveraging <strong>Vanna AI 2.0</strong> for logic and <strong>Pydantic AI</strong> for orchestration, it enables seamless interaction with PostGIS databases.
+                </p>
+            </header>
+
+            <!-- KPI Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <div class="text-slate-400 text-sm font-medium uppercase tracking-wider mb-1">Core Architecture</div>
+                    <div class="text-3xl font-bold text-slate-800">3 Modules</div>
+                    <div class="text-sky-600 text-sm mt-2 font-medium">API • Frontend • Admin</div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <div class="text-slate-400 text-sm font-medium uppercase tracking-wider mb-1">Processing Logic</div>
+                    <div class="text-3xl font-bold text-slate-800">11 Phases</div>
+                    <div class="text-purple-600 text-sm mt-2 font-medium">Ingestion to Feedback</div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <div class="text-slate-400 text-sm font-medium uppercase tracking-wider mb-1">AI Engine</div>
+                    <div class="text-3xl font-bold text-slate-800">Vanna 2.0</div>
+                    <div class="text-green-600 text-sm mt-2 font-medium">RAG + Text-to-SQL</div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <div class="text-slate-400 text-sm font-medium uppercase tracking-wider mb-1">Output Types</div>
+                    <div class="text-3xl font-bold text-slate-800">Multi-Modal</div>
+                    <div class="text-orange-500 text-sm mt-2 font-medium">Text, Tables, Charts, Maps</div>
+                </div>
+            </div>
+
+            <!-- Architecture Diagram -->
+            <div class="bg-white p-8 rounded-xl shadow-sm border border-slate-200 mb-8">
+                <h3 class="text-xl font-bold text-slate-800 mb-6">System Architecture Map</h3>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 relative">
+                    
+                    <!-- Module 2 -->
+                    <div class="module-card bg-slate-50 border-t-4 border-sky-500 rounded-lg p-6 relative">
+                        <div class="absolute -top-3 left-4 bg-sky-100 text-sky-700 text-xs font-bold px-2 py-1 rounded uppercase">Frontend</div>
+                        <h4 class="text-lg font-bold text-slate-800 mb-2">Module 2: Immersive UI</h4>
+                        <p class="text-sm text-slate-600 mb-4">React + CopilotKit + Leaflet</p>
+                        <div class="space-y-2">
+                            <div class="flex items-center text-sm text-slate-600 bg-white p-2 rounded border border-slate-200 shadow-sm">
+                                <span class="mr-2">💬</span> Chat Interface
+                            </div>
+                            <div class="flex items-center text-sm text-slate-600 bg-white p-2 rounded border border-slate-200 shadow-sm">
+                                <span class="mr-2">🗺️</span> Map Visualization
+                            </div>
+                            <div class="flex items-center text-sm text-slate-600 bg-white p-2 rounded border border-slate-200 shadow-sm">
+                                <span class="mr-2">🧪</span> Homologation Mode
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Module 1 -->
+                    <div class="module-card bg-slate-50 border-t-4 border-purple-500 rounded-lg p-6 relative shadow-md transform lg:-translate-y-4 z-10">
+                        <div class="absolute -top-3 left-4 bg-purple-100 text-purple-700 text-xs font-bold px-2 py-1 rounded uppercase">Backend Core</div>
+                        <h4 class="text-lg font-bold text-slate-800 mb-2">Module 1: Intelligence API</h4>
+                        <p class="text-sm text-slate-600 mb-4">Python + Vanna + Pydantic</p>
+                        <div class="space-y-2">
+                            <div class="flex items-center text-sm text-slate-600 bg-white p-2 rounded border border-slate-200 shadow-sm">
+                                <span class="mr-2">🧠</span> RAG Orchestration
+                            </div>
+                            <div class="flex items-center text-sm text-slate-600 bg-white p-2 rounded border border-slate-200 shadow-sm">
+                                <span class="mr-2">🛡️</span> Safety & Cost Agents
+                            </div>
+                            <div class="flex items-center text-sm text-slate-600 bg-white p-2 rounded border border-slate-200 shadow-sm">
+                                <span class="mr-2">📍</span> Geo-Routing Logic
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Module 3 -->
+                    <div class="module-card bg-slate-50 border-t-4 border-green-500 rounded-lg p-6 relative">
+                        <div class="absolute -top-3 left-4 bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded uppercase">Admin</div>
+                        <h4 class="text-lg font-bold text-slate-800 mb-2">Module 3: Management</h4>
+                        <p class="text-sm text-slate-600 mb-4">Dashboard & Editors</p>
+                        <div class="space-y-2">
+                            <div class="flex items-center text-sm text-slate-600 bg-white p-2 rounded border border-slate-200 shadow-sm">
+                                <span class="mr-2">📚</span> Training Data Editor
+                            </div>
+                            <div class="flex items-center text-sm text-slate-600 bg-white p-2 rounded border border-slate-200 shadow-sm">
+                                <span class="mr-2">🔌</span> DB Connections
+                            </div>
+                            <div class="flex items-center text-sm text-slate-600 bg-white p-2 rounded border border-slate-200 shadow-sm">
+                                <span class="mr-2">👥</span> User Management
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: PIPELINE SIMULATOR -->
+        <section id="pipeline" class="content-section max-w-7xl mx-auto">
+            <header class="mb-8">
+                <h2 class="text-3xl font-bold text-slate-800 mb-2">The Intelligent Pipeline</h2>
+                <p class="text-slate-600 max-w-3xl">
+                    Experience the 11-step logic flow executed by Module 1 for every user request. 
+                    This simulator demonstrates how Vanna AI and Pydantic Agents collaborate to ensure accuracy, safety, and performance.
+                </p>
+            </header>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[600px]">
+                
+                <!-- Left: Interactive Flow List -->
+                <div class="lg:col-span-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-y-auto p-2">
+                    <div class="space-y-2" id="pipelineStepsContainer">
+                        <!-- JS will populate this -->
+                    </div>
+                </div>
+
+                <!-- Right: Active Step Details -->
+                <div class="lg:col-span-8 bg-slate-800 rounded-xl shadow-lg p-8 flex flex-col justify-center relative overflow-hidden text-white">
+                    <!-- Background Decoration -->
+                    <div class="absolute top-0 right-0 w-64 h-64 bg-slate-700 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
+
+                    <div id="pipelineDetailContent">
+                        <div class="inline-block px-3 py-1 bg-sky-500 text-white text-xs font-bold rounded mb-4">Select a step to begin</div>
+                        <h3 class="text-3xl font-bold mb-4">Pipeline Explorer</h3>
+                        <p class="text-slate-300 text-lg">Click on the steps in the left panel to visualize the transformation of data from a raw user question to a geospatial visualization.</p>
+                        <button onclick="simulateStep(0)" class="mt-8 bg-sky-600 hover:bg-sky-500 text-white px-6 py-3 rounded-lg font-medium transition-colors w-max">Start Simulation ▶</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3: ANALYTICS -->
+        <section id="analytics" class="content-section max-w-7xl mx-auto">
+            <header class="mb-8">
+                <h2 class="text-3xl font-bold text-slate-800 mb-2">Performance Analytics</h2>
+                <p class="text-slate-600 max-w-3xl">
+                    Technical metrics estimating the system's operational efficiency, functional capabilities, and the complexity of the underlying vector database.
+                </p>
+            </header>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <!-- Latency Chart -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h3 class="text-lg font-bold text-slate-800 mb-4">Est. Pipeline Latency (ms)</h3>
+                    <div class="chart-container">
+                        <canvas id="latencyChart"></canvas>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-4 text-center">SQL Generation & Execution are the most time-intensive phases.</p>
+                </div>
+
+                <!-- Capabilities Radar -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h3 class="text-lg font-bold text-slate-800 mb-4">Module Capabilities</h3>
+                    <div class="chart-container">
+                        <canvas id="radarChart"></canvas>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-4 text-center">Comparing functional focus areas across the three modules.</p>
+                </div>
+            </div>
+
+            <!-- 3D Vector Space -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold text-slate-800">Knowledge Base Vector Space</h3>
+                    <span class="px-2 py-1 bg-slate-100 text-slate-500 text-xs rounded">3D Visualization</span>
+                </div>
+                <div class="chart-container h-[500px]">
+                    <div id="vectorPlot" style="width: 100%; height: 100%;"></div>
+                </div>
+                <p class="text-sm text-slate-600 mt-4">
+                    Representation of how Vanna AI embeds DDL schemas, SQL queries, and Geospatial terms in high-dimensional space for Retrieval-Augmented Generation (RAG).
+                </p>
+            </div>
+        </section>
+
+        <!-- SECTION 4: MODULE SPECS -->
+        <section id="modules" class="content-section max-w-7xl mx-auto">
+            <header class="mb-8">
+                <h2 class="text-3xl font-bold text-slate-800 mb-2">Technical Specifications</h2>
+                <p class="text-slate-600 max-w-3xl">
+                    Detailed breakdown of the technologies and specific responsibilities for each component of the platform.
+                </p>
+            </header>
+
+            <!-- Tabs -->
+            <div class="flex space-x-2 border-b border-slate-200 mb-6 overflow-x-auto">
+                <button onclick="showTab('tab-mod1')" class="spec-tab active px-6 py-3 text-sm font-medium text-slate-600 border-b-2 border-transparent hover:text-sky-600 focus:outline-none whitespace-nowrap">Module 1 (Core)</button>
+                <button onclick="showTab('tab-mod2')" class="spec-tab px-6 py-3 text-sm font-medium text-slate-600 border-b-2 border-transparent hover:text-sky-600 focus:outline-none whitespace-nowrap">Module 2 (Frontend)</button>
+                <button onclick="showTab('tab-mod3')" class="spec-tab px-6 py-3 text-sm font-medium text-slate-600 border-b-2 border-transparent hover:text-sky-600 focus:outline-none whitespace-nowrap">Module 3 (Admin)</button>
+            </div>
+
+            <!-- Tab Content 1 -->
+            <div id="tab-mod1" class="spec-content active bg-white p-8 rounded-xl shadow-sm border border-slate-200">
+                <h3 class="text-2xl font-bold text-slate-800 mb-4">Module 1: Core Intelligence API</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h4 class="font-bold text-sky-600 mb-2">Key Technologies</h4>
+                        <ul class="list-disc list-inside text-slate-600 space-y-1 mb-6">
+                            <li>Python 3.11+</li>
+                            <li>Vanna AI 2.0 (Custom Class Inheritance)</li>
+                            <li>Pydantic AI (Agent Orchestration)</li>
+                            <li>FastAPI (Async Endpoints)</li>
+                            <li>PostgreSQL (App DB) + PostGIS (Target DB)</li>
+                        </ul>
+                        <h4 class="font-bold text-purple-600 mb-2">Primary Roles</h4>
+                        <ul class="list-disc list-inside text-slate-600 space-y-1">
+                            <li>Ingest DDL and generate embeddings.</li>
+                            <li>Contextualize user queries via history.</li>
+                            <li>Generate and validate SQL safely.</li>
+                            <li>Route Geospatial results (GeoJSON vs WMS).</li>
+                        </ul>
+                    </div>
+                    <div class="bg-slate-50 p-4 rounded border border-slate-100">
+                        <div class="text-xs font-mono text-slate-500 mb-2">Code Snippet Concept</div>
+                        <pre class="text-xs text-slate-700 overflow-x-auto">
+class GeoVanna(VannaBase):
+  def process_request(self, query):
+    # 1. Context Agent
+    q = ContextAgent.refine(query)
+    # 2. RAG & SQL
+    sql = self.generate_sql(q)
+    # 3. Safety Check
+    if not SafetyAgent.validate(sql):
+       return "Error"
+    # 4. Geo Execution
+    return GeoRouter.route(sql)
+                        </pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content 2 -->
+            <div id="tab-mod2" class="spec-content hidden bg-white p-8 rounded-xl shadow-sm border border-slate-200">
+                <h3 class="text-2xl font-bold text-slate-800 mb-4">Module 2: Immersive Interface</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h4 class="font-bold text-sky-600 mb-2">Key Technologies</h4>
+                        <ul class="list-disc list-inside text-slate-600 space-y-1 mb-6">
+                            <li>React 18 (Vite) + TypeScript</li>
+                            <li>CopilotKit (Frontend AI SDK)</li>
+                            <li>Leaflet / React-Leaflet</li>
+                            <li>Tailwind CSS + Shadcn/UI</li>
+                            <li>Zustand (State Management)</li>
+                        </ul>
+                        <h4 class="font-bold text-purple-600 mb-2">Features</h4>
+                        <ul class="list-disc list-inside text-slate-600 space-y-1">
+                            <li>Chat-Over-Map layout.</li>
+                            <li>Homologation Mode (`?test=true`) for debugging.</li>
+                            <li>Action Triggers: `update_map_view`, `add_wms_layer`.</li>
+                            <li>Real-time feedback loop (Thumbs Up/Down).</li>
+                        </ul>
+                    </div>
+                     <div class="bg-slate-50 p-4 rounded border border-slate-100">
+                        <div class="text-xs font-mono text-slate-500 mb-2">Action Definition Concept</div>
+                        <pre class="text-xs text-slate-700 overflow-x-auto">
+useCopilotAction({
+  name: "updateMapLayer",
+  handler: async ({ type, url }) => {
+    if (type === 'wms') {
+       L.tileLayer.wms(url).addTo(map);
+    }
+  }
+});
+                        </pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content 3 -->
+            <div id="tab-mod3" class="spec-content hidden bg-white p-8 rounded-xl shadow-sm border border-slate-200">
+                <h3 class="text-2xl font-bold text-slate-800 mb-4">Module 3: Management Dashboard</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h4 class="font-bold text-sky-600 mb-2">Key Technologies</h4>
+                        <ul class="list-disc list-inside text-slate-600 space-y-1 mb-6">
+                            <li>React (Shared logic with Mod 2)</li>
+                            <li>Data Grid Components</li>
+                            <li>Rest API Integration</li>
+                        </ul>
+                        <h4 class="font-bold text-purple-600 mb-2">Capabilities</h4>
+                        <ul class="list-disc list-inside text-slate-600 space-y-1">
+                            <li>Manage Projects & DB Connections.</li>
+                            <li><strong>Dictionary Editor:</strong> Annotate column meanings.</li>
+                            <li><strong>QA Lab:</strong> Edit trained SQL/Question pairs.</li>
+                            <li>Trigger model retraining manually.</li>
+                        </ul>
+                    </div>
+                    <div class="flex items-center justify-center bg-slate-50 rounded border border-slate-100">
+                        <div class="text-center p-4">
+                            <div class="text-4xl mb-2">⚙️</div>
+                            <p class="text-sm text-slate-500">Admin Control Center</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <script>
+        // --- NAVIGATION LOGIC ---
+        function showSection(sectionId) {
+            // Update Menu
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.classList.remove('active');
+                el.classList.remove('bg-slate-50');
+                el.classList.remove('text-sky-600');
+            });
+            
+            // Find button that calls this function with this sectionId
+            const activeBtn = Array.from(document.querySelectorAll('.nav-item')).find(btn => btn.getAttribute('onclick').includes(sectionId));
+            if(activeBtn) {
+                activeBtn.classList.add('active');
+            }
+
+            // Update Content
+            document.querySelectorAll('.content-section').forEach(el => el.classList.remove('active'));
+            document.getElementById(sectionId).classList.add('active');
+
+            // Trigger chart resize if needed
+            if (sectionId === 'analytics') {
+                setTimeout(() => {
+                    renderCharts(); // Ensure charts render when visible
+                }, 100);
+            }
+        }
+
+        // --- TAB LOGIC ---
+        function showTab(tabId) {
+            document.querySelectorAll('.spec-tab').forEach(el => {
+                el.classList.remove('active', 'border-sky-600', 'text-sky-600');
+                el.classList.add('border-transparent');
+            });
+            // Find clicked tab logic is simplified here by event delegation or simple class toggle
+            const clickedTab = Array.from(document.querySelectorAll('.spec-tab')).find(btn => btn.getAttribute('onclick').includes(tabId));
+            if(clickedTab) {
+                clickedTab.classList.add('active', 'border-sky-600', 'text-sky-600');
+                clickedTab.classList.remove('border-transparent');
+            }
+
+            document.querySelectorAll('.spec-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(tabId).classList.remove('hidden');
+        }
+
+        // --- PIPELINE DATA ---
+        const pipelineSteps = [
+            { id: 1, title: "Ingestion (Async)", agent: "Metadata Agent", desc: "Extracts DDL, comments, and domain values from DB. Generates initial training data.", color: "bg-slate-600" },
+            { id: 2, title: "Context Analysis", agent: "Context Agent", desc: "Reformulates user question based on chat history (e.g., 'Show me beans' -> 'Show me bean producers').", color: "bg-sky-500" },
+            { id: 3, title: "RAG Retrieval", agent: "Vanna Core", desc: "Fetches relevant SQL pairs, DDL, and documentation from the Vector DB.", color: "bg-sky-500" },
+            { id: 4, title: "Prompt Building", agent: "Prompt Builder", desc: "Constructs a system prompt injecting Postgres rules, spatial logic, and retrieved context.", color: "bg-sky-500" },
+            { id: 5, title: "SQL Generation", agent: "LLM (Model)", desc: "Generates the raw SQL query from the enriched prompt.", color: "bg-purple-500" },
+            { id: 6, title: "Safety Check", agent: "Safety Agent", desc: "Validates syntax. Blocks prohibited keywords (DROP, DELETE, UPDATE).", color: "bg-purple-500" },
+            { id: 7, title: "Cost Estimation", agent: "Cost Agent", desc: "Runs `EXPLAIN` to predict query cost. Aborts if the query is too expensive.", color: "bg-purple-500" },
+            { id: 8, title: "Execution", agent: "DB Connector", desc: "Runs the sanitized SQL against the PostGIS database.", color: "bg-purple-500" },
+            { id: 9, title: "Classification", agent: "Output Agent", desc: "Determines if output is Text, Table, Chart, or Map.", color: "bg-green-500" },
+            { id: 10, title: "Geo-Routing", agent: "Geo Agent", desc: "Decides: Small Data? -> GeoJSON. Large/Styled? -> Call GeoServer API for WMS.", color: "bg-green-500" },
+            { id: 11, title: "Feedback Loop", agent: "Training Handler", desc: "If user approves, retrains the model with the new Q/SQL pair.", color: "bg-orange-500" }
+        ];
+
+        // --- PIPELINE SIMULATOR LOGIC ---
+        const stepsContainer = document.getElementById('pipelineStepsContainer');
+        const detailContent = document.getElementById('pipelineDetailContent');
+
+        function initPipeline() {
+            stepsContainer.innerHTML = '';
+            pipelineSteps.forEach((step, index) => {
+                const div = document.createElement('div');
+                div.className = `pipeline-step cursor-pointer p-3 rounded-lg border border-slate-100 bg-slate-50 hover:bg-white flex items-center justify-between group`;
+                div.onclick = () => simulateStep(index);
+                div.id = `step-${index}`;
+                div.innerHTML = `
+                    <div class="flex items-center">
+                        <span class="w-6 h-6 rounded-full ${step.color} text-white text-xs flex items-center justify-center mr-3 font-bold">${step.id}</span>
+                        <span class="text-sm font-medium text-slate-700 group-hover:text-sky-600">${step.title}</span>
+                    </div>
+                    <span class="text-xs text-slate-400">➤</span>
+                `;
+                stepsContainer.appendChild(div);
+            });
+        }
+
+        function simulateStep(index) {
+            // Update Active State in List
+            document.querySelectorAll('.pipeline-step').forEach(el => el.classList.remove('active', 'border-sky-500', 'bg-sky-50'));
+            const activeStep = document.getElementById(`step-${index}`);
+            if(activeStep) {
+                activeStep.classList.add('active', 'border-sky-500', 'bg-sky-50');
+                activeStep.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            const stepData = pipelineSteps[index];
+
+            // Update Detail View with Animation
+            detailContent.style.opacity = '0';
+            setTimeout(() => {
+                detailContent.innerHTML = `
+                    <div class="inline-block px-3 py-1 ${stepData.color} text-white text-xs font-bold rounded mb-4 shadow-sm">Phase ${stepData.id}: ${stepData.agent}</div>
+                    <h3 class="text-3xl font-bold mb-4">${stepData.title}</h3>
+                    <p class="text-slate-300 text-lg leading-relaxed">${stepData.desc}</p>
+                    
+                    ${index < pipelineSteps.length - 1 ? 
+                        `<button onclick="simulateStep(${index + 1})" class="mt-8 bg-white text-slate-900 hover:bg-slate-100 px-6 py-3 rounded-lg font-bold transition-colors shadow-lg">Next Phase ➜</button>` 
+                        : `<div class="mt-8 text-green-400 font-bold text-xl">Pipeline Complete ✅</div>`
+                    }
+                `;
+                detailContent.style.opacity = '1';
+            }, 200);
+        }
+
+        // --- CHARTS LOGIC ---
+        let chartsInitialized = false;
+
+        function renderCharts() {
+            if (chartsInitialized) return;
+            chartsInitialized = true;
+
+            // 1. Latency Chart
+            const ctxLatency = document.getElementById('latencyChart').getContext('2d');
+            new Chart(ctxLatency, {
+                type: 'bar',
+                data: {
+                    labels: ["Context", "RAG", "LLM Gen", "Safety", "Cost Est.", "Execution"],
+                    datasets: [{
+                        label: 'Time (ms)',
+                        data: [150, 200, 1200, 100, 50, 400],
+                        backgroundColor: ['#e0f2fe', '#bae6fd', '#0ea5e9', '#7dd3fc', '#38bdf8', '#0284c7'],
+                        borderRadius: 4,
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // 2. Radar Chart
+            const ctxRadar = document.getElementById('radarChart').getContext('2d');
+            new Chart(ctxRadar, {
+                type: 'radar',
+                data: {
+                    labels: ["NLP", "Geo Render", "Data Mgmt", "Security", "UI/UX"],
+                    datasets: [
+                        {
+                            label: 'Module 1',
+                            data: [95, 20, 40, 90, 10],
+                            borderColor: '#8b5cf6',
+                            backgroundColor: 'rgba(139, 92, 246, 0.2)',
+                        },
+                        {
+                            label: 'Module 2',
+                            data: [10, 100, 10, 20, 100],
+                            borderColor: '#06b6d4',
+                            backgroundColor: 'rgba(6, 182, 212, 0.2)',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            angleLines: { color: '#cbd5e1' },
+                            grid: { color: '#e2e8f0' }
+                        }
+                    }
+                }
+            });
+
+            // 3. Plotly Vector Space
+            const vectorData = [
+                {
+                    x: Array.from({length: 50}, () => Math.random() * 10),
+                    y: Array.from({length: 50}, () => Math.random() * 10),
+                    z: Array.from({length: 50}, () => Math.random() * 10),
+                    mode: 'markers',
+                    type: 'scatter3d',
+                    name: 'DDL',
+                    marker: { size: 4, color: '#0ea5e9', opacity: 0.8 }
+                },
+                {
+                    x: Array.from({length: 50}, () => Math.random() * 10),
+                    y: Array.from({length: 50}, () => Math.random() * 10),
+                    z: Array.from({length: 50}, () => Math.random() * 10),
+                    mode: 'markers',
+                    type: 'scatter3d',
+                    name: 'Questions',
+                    marker: { size: 4, color: '#8b5cf6', opacity: 0.8 }
+                }
+            ];
+            const layout = {
+                margin: { l: 0, r: 0, b: 0, t: 0 },
+                showlegend: true,
+                scene: {
+                    xaxis: { showgrid: true, gridcolor: '#e2e8f0', zeroline: false, showticklabels: false },
+                    yaxis: { showgrid: true, gridcolor: '#e2e8f0', zeroline: false, showticklabels: false },
+                    zaxis: { showgrid: true, gridcolor: '#e2e8f0', zeroline: false, showticklabels: false },
+                    bgcolor: 'rgba(0,0,0,0)'
+                },
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                legend: { x: 0, y: 1 }
+            };
+            Plotly.newPlot('vectorPlot', vectorData, layout, {displayModeBar: false});
+        }
+
+        // --- INIT ---
+        initPipeline();
+
+    </script>
+</body>
+</html>
