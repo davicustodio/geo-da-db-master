@@ -39,7 +39,9 @@ O Vanna AI 2.0 e o framework principal de agente SQL no modulo, com:
 - `Agent` para orquestrar raciocinio e uso de ferramentas;
 - `ToolRegistry` para registrar ferramentas com controle de acesso;
 - `UserResolver` para identidade, grupos e autorizacao;
+- `RequestContext` para propagacao de cookies, headers, metadata e origem da requisicao;
 - `Tool Memory` para reaproveitar interacoes corretas;
+- `chat_sse`, `chat_websocket` e `chat_poll` como transportes nativos de runtime;
 - fluxo nativo:
   - pergunta similar -> busca memoria -> adapta SQL -> executa variante;
   - pergunta nova -> investigacao profunda -> gera SQL -> executa e valida -> salva memoria.
@@ -48,7 +50,9 @@ O Vanna AI 2.0 e o framework principal de agente SQL no modulo, com:
 
 **Nativo/coberto pelo Vanna 2.0**
 - agente + tools + memoria + permissoes por usuario/grupo;
-- adaptacao de consultas com base em historico de sucesso.
+- adaptacao de consultas com base em historico de sucesso;
+- streaming progressivo de resposta (SSE/WebSocket/Polling) e componentes ricos;
+- suporte a `VannaFastAPIServer` ou `register_chat_routes` em app FastAPI existente.
 
 **Extensao arquitetural deste sistema**
 - descoberta automatica de metadados do banco por projeto;
@@ -74,6 +78,9 @@ O Vanna AI 2.0 e o framework principal de agente SQL no modulo, com:
 - **Result Presentation Planner**: decide formato de resposta.
 - **Geo Routing Engine**: decide GeoJSON, MVT ou GeoServer por volume/complexidade.
 - **Vanna Integration Layer**: integra Agent, ToolRegistry e Tool Memory.
+- **Vanna Transport Adapter**: compatibiliza `POST /projects/{project_id}/ask` com canais nativos `chat_sse`, `chat_websocket` e `chat_poll`.
+- **Agent Memory Backend Manager**: define backend de memoria por ambiente (dev/hml/prod) e escopo por projeto/usuario.
+- **Lifecycle Governance Hooks**: aplica rate limit, quotas e auditoria por usuario/grupo/tool.
 - **Project Artifact Store**: persiste datasets por projeto e versao.
 
 ### 4.2 Tecnologias e frameworks (arquitetural)
@@ -84,7 +91,9 @@ O Vanna AI 2.0 e o framework principal de agente SQL no modulo, com:
 - Redis (cache/fila);
 - Temporal ou runner de workflow equivalente;
 - armazenamento versionado (filesystem ou object storage);
-- Vault/KMS para segredos.
+- Vault/KMS para segredos;
+- ChatHandler + `register_chat_routes` (quando integracao com app FastAPI existente);
+- backend de `agent_memory` (ex.: in-memory para dev e persistente para producao).
 
 ---
 
@@ -121,7 +130,7 @@ O Vanna AI 2.0 e o framework principal de agente SQL no modulo, com:
 ### Fase T3 - Ingestao no Vanna
 
 - converte corpus para contexto de treino do agente;
-- publica no Tool Memory;
+- publica no Tool Memory (Q/tool/args) e memorias textuais auxiliares quando necessario;
 - associa dataset a `project_id` e `dataset_version`.
 
 ### Fase T4 - Gate de qualidade
@@ -142,6 +151,7 @@ O Vanna AI 2.0 e o framework principal de agente SQL no modulo, com:
 ### Fase R0 - Entrada e contexto de usuario
 
 - recebe chamada `ask` com `project_id` + contexto de usuario;
+- normaliza `request_context` com `cookies`, `headers`, `query_params`, `remote_addr` e `metadata`;
 - aplica `UserResolver` para obter identidade e grupos;
 - carrega regras de acesso ao conteudo do banco.
 
@@ -214,6 +224,7 @@ O Vanna AI 2.0 e o framework principal de agente SQL no modulo, com:
 
 - retorna payload multimodal final para Modulo 2;
 - quando geografico, retorna tambem payload de estilo (leaflet-style-json ou SLD-profile);
+- suporta entrega progressiva por `SSE`, `WebSocket` ou `Polling`, conforme canal negociado;
 - se background: retorna `query_id` e canal de acompanhamento.
 
 ### Fase R10 - Aprendizado continuo
@@ -236,12 +247,24 @@ O Vanna AI 2.0 e o framework principal de agente SQL no modulo, com:
 ### 7.2 APIs de runtime
 
 - `POST /projects/{project_id}/ask`
-  - recebe pergunta + contexto de usuario para `UserResolver`;
+  - recebe pergunta + `request_context` (`cookies`, `headers`, `query_params`, `remote_addr`, `metadata`) para `UserResolver`;
   - permite politica de execucao (`sync` ou `background`);
   - retorna metadados de modalidade de resposta, estrategia geoespacial e perfil de estilo cartografico quando aplicavel.
 
 - `GET /projects/{project_id}/queries/{query_id}`
   - consulta status/progresso/resultado de execucao em background.
+
+### 7.3 APIs nativas Vanna 2.0 (via adapter ou exposicao direta)
+
+- `POST /api/vanna/v2/chat_sse`
+  - streaming progressivo de componentes de resposta.
+- `WebSocket /api/vanna/v2/chat_websocket`
+  - stream bidirecional para chat em tempo real.
+- `POST /api/vanna/v2/chat_poll`
+  - resposta agregada por polling HTTP.
+- diretriz:
+  - manter `POST /projects/{project_id}/ask` como contrato de negocio do produto;
+  - usar `Vanna Transport Adapter` para mapear contrato interno para endpoints nativos quando aplicavel.
 
 ---
 
@@ -267,6 +290,13 @@ Arquivos obrigatorios:
 - senha nao aparece em logs, payloads ou UI;
 - rotacao de segredo e principio de minimo privilegio sao obrigatorios.
 
+### 8.3 Isolamento e persistencia de Tool Memory
+
+- isolar memoria por `project_id` e contexto de usuario/grupo;
+- em desenvolvimento: backend in-memory para iteracao rapida;
+- em producao: backend persistente com politica de retencao e limpeza;
+- registrar metadados de memoria (fonte, versao de dataset, timestamp, score de similaridade) para auditoria.
+
 ---
 
 ## 9. Integracao com outros modulos
@@ -289,7 +319,10 @@ Metricas recomendadas por projeto:
 - taxa de roteamento A/C/B em geoespacial;
 - taxa de aplicacao de estilos por tipo de geometria;
 - taxa de uso de classificacao Jenks em respostas geograficas;
-- taxa de sucesso de jobs de treinamento.
+- taxa de sucesso de jobs de treinamento;
+- taxa de bloqueio por rate limit/quota por usuario e grupo;
+- cobertura de auditoria por tool executada;
+- taxa de acerto de recuperacao de memoria (memory hit util vs memory hit total).
 
 ---
 
@@ -345,6 +378,9 @@ flowchart TD
 8. O FastAPI e o gerenciador principal de requisicoes e respostas do Modulo 1.
 9. O Vanna AI 2.0 e o orquestrador principal do fluxo agencial do modulo.
 10. As fases geoespaciais e de governanca sao extensoes especializadas do backend.
+11. O contrato de entrada deve propagar `RequestContext` completo para `UserResolver`.
+12. O modulo deve suportar canais nativos Vanna (`chat_sse`, `chat_websocket`, `chat_poll`) por adaptacao ou exposicao direta.
+13. O `agent_memory` deve ter estrategia explicita de backend, isolamento e retencao por ambiente e projeto.
 
 ---
 
@@ -352,14 +388,14 @@ flowchart TD
 
 | Fase | Objetivo da fase | Frameworks/Tecnologias principais | Componente/funcao especifica | Inferencia com LLM |
 |---|---|---|---|---|
-| Camada transversal | Governar entrada, saida e orquestracao global do modulo | FastAPI, Vanna AI 2.0, OpenTelemetry, Redis | `FastAPI API Core` (gateway), `Vanna Agent` (orquestrador), middleware de observabilidade | Nao obrigatoria (camada de controle) |
+| Camada transversal | Governar entrada, saida e orquestracao global do modulo | FastAPI, Vanna AI 2.0, OpenTelemetry, Redis | `FastAPI API Core` (gateway), `Vanna Agent` (orquestrador), `Vanna Transport Adapter`, `LifecycleGovernanceHooks`, middleware de observabilidade | Nao obrigatoria (camada de controle) |
 | T0 - Contexto de projeto e seguranca | Resolver projeto, credenciais e autorizacao de treinamento | FastAPI, Vault/KMS, Vanna `UserResolver` | `ProjectContextResolver`, `SecretResolver`, `AccessPolicyEvaluator` | Nao (deterministico/regra) |
 | T1 - Descoberta de metadados | Extrair DDL, dicionario, dominios e contexto geoespacial (SRID/unidade/projecao) | PostgreSQL/PostGIS (`geometry_columns`, `spatial_ref_sys`), SQLAlchemy, pandas | `MetadataDiscoveryService`, `SchemaIntrospector`, `DomainProfiler`, `SpatialProjectionProfiler` | Opcional para normalizar descricoes de dicionario (modelo pequeno) |
 | T2 - Construcao de corpus | Gerar `ddl.md`, `dictionary.md`, `questions.md` (>=50 Q&A SQL) + guia de funcoes PostGIS por projecao | Vanna AI 2.0, Jinja2/templating, object storage | `CorpusBuilder`, `QuestionSqlGenerator`, `ArtifactWriter`, `PostgisFunctionGuidanceBuilder` | Sim. Recomendado: Claude Sonnet 4.5 ou GPT-4.1 |
-| T3 - Ingestao no Vanna | Publicar corpus no Tool Memory e contexto do agente | Vanna `ToolRegistry`, `SaveQuestionToolArgsTool`, `SearchSavedCorrectToolUsesTool` | `TrainingPublisher`, `ToolMemoryIndexer` | Nao obrigatoria |
+| T3 - Ingestao no Vanna | Publicar corpus no Tool Memory e contexto do agente | Vanna `ToolRegistry`, `SaveQuestionToolArgsTool`, `SearchSavedCorrectToolUsesTool`, `SaveTextMemoryTool` | `TrainingPublisher`, `ToolMemoryIndexer`, `MemoryMetadataEnricher` | Nao obrigatoria |
 | T4 - Gate de qualidade | Validar completude, consistencia e cobertura do dataset | Great Expectations (ou checks custom), SQL parser (`sqlglot`) | `DatasetQualityGate`, `SqlExampleValidator` | Opcional para classificar qualidade semantica (modelo medio) |
 | T5 - Publicacao do dataset | Ativar dataset do projeto e registrar auditoria | FastAPI, PostgreSQL (metadados), OpenTelemetry | `DatasetActivationService`, `PublicationAuditLogger` | Nao |
-| R0 - Entrada e contexto de usuario | Ler pergunta e contexto de usuario/projeto | FastAPI, Vanna `UserResolver`, JWT/OAuth2 | `AskRequestHandler`, `UserContextResolver` | Nao |
+| R0 - Entrada e contexto de usuario | Ler pergunta e contexto de usuario/projeto | FastAPI, Vanna `UserResolver`, `RequestContext`, JWT/OAuth2 | `AskRequestHandler`, `RequestContextNormalizer`, `UserContextResolver` | Nao |
 | R1 - Classificacao de intencao | Decidir se entrada e comando UI ou consulta SQL | Vanna Agent, cache Redis | `IntentRouterAgent` | Sim. Recomendado: Claude Haiku 4.5 ou GPT-4o mini (baixa latencia) |
 | R2 - Geracao/adaptacao SQL | Reaproveitar memoria ou gerar SQL nova | Vanna Tool Memory + `RunSqlTool` | `SqlPlannerAgent`, `MemoryRetriever` | Sim. Recomendado: Claude Sonnet 4.5 ou GPT-4.1 |
 | R3 - Validacao de SQL e seguranca | Bloquear SQL insegura e aplicar politicas de acesso | `sqlglot`, regras RBAC/RLS, allowlist/denylist | `SqlSecurityGuard`, `PolicyEnforcer` | Opcional para remediacao assistida; validacao principal deve ser deterministica |
@@ -368,5 +404,5 @@ flowchart TD
 | R6 - Planejamento multimodal | Definir resposta: texto, tabela, grafico ou mapa | Vanna `VisualizeDataTool`, Plotly schema, contrato JSON | `ResponseModalityPlanner`, `ChartTypeSelector` | Sim. Recomendado: Claude Sonnet 4.5 ou GPT-4.1 (com fallback heuristico) |
 | R7 - Roteamento geoespacial | Escolher GeoJSON, MVT ou GeoServer por volume | PostGIS (`ST_AsGeoJSON`, `ST_AsMVT`), GeoServer, GeoWebCache | `GeoRoutingEngine`, `TileStrategySelector` | Nao (decisao por regras/thresholds) |
 | R8 - Estilizacao cartografica | Gerar estilo para Leaflet ou SLD para GeoServer, com Jenks quando aplicavel | `jenkspy`, GeoPandas/mapclassify (opcional), SLD builder, ColorBrewer/Mapbox style spec | `GeoStylePlanner`, `JenksClassifier`, `LeafletStyleComposer`, `SldStyleComposer` | Sim. Recomendado: Claude Sonnet 4.5 para sugestao semantica de estilo (com guardrails deterministicos) |
-| R9 - Entrega da resposta | Retornar payload final, estado de execucao e metadados de estilo | FastAPI, SSE/WebSocket | `ResponseAssembler`, `StreamingNotifier`, `QueryStatusApi`, `StylePayloadAdapter` | Nao |
+| R9 - Entrega da resposta | Retornar payload final, estado de execucao e metadados de estilo | FastAPI, SSE/WebSocket/Polling | `ResponseAssembler`, `StreamingNotifier`, `VannaChatTransportBridge`, `QueryStatusApi`, `StylePayloadAdapter` | Nao |
 | R10 - Aprendizado continuo | Salvar interacoes bem-sucedidas no Tool Memory | Vanna Tool Memory, observabilidade | `LearningFeedbackService`, `MemoryWriter` | Opcional para curadoria automatica de exemplos |
