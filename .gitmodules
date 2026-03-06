@@ -4,3 +4,6 @@
 [submodule "ai-data-pilot-manager"]
 	path = ai-data-pilot-manager
 	url = https://gitlab.cnpm.embrapa.br/davi/ai-data-pilot-manager.git
+[submodule "maps-api"]
+	path = maps-api
+	url = https://gitlab.cnpm.embrapa.br/davi/maps-api-sql-view-geoserver.git
