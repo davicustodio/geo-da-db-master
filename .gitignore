@@ -1,2 +1,4 @@
 .DS_Store
 .env
+ai-data-pilot-manager/node_modules
+ai-data-pilot-manager/dist
