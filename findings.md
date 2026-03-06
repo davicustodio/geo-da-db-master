@@ -147,3 +147,65 @@
 - `ai-data-pilot-manager`: `627c2f8` (`feat: complete module3 control plane ui`)
 - `api-geo-nlp`: `57b1f8c` (`feat: finish module3 control plane and access runtime`)
 - O repo `api-geo-nlp` permaneceu com delecoes nao commitadas em `docs/workflow_runtime_20x_*`, deixadas intactas por serem residuos preexistentes fora do escopo.
+
+## Descobertas da analise de UX de treinamento (2026-03-06)
+
+21. **O botao `Salvar e iniciar treinamento` nao acompanha o processo**
+- `ProjectSetupPage.tsx` apenas chama `resetAndRegenerate(projectId)` e mostra `Pipeline iniciado com sucesso. Job: ...`.
+- Nao existe polling do job, indicacao de etapa atual, termino nem falha.
+
+22. **Os atalhos de workspace continuam liberados mesmo com treino em andamento ou inexistente**
+- `ProjectWorkspaceNav.tsx` sempre habilita `Metadata`, `Questions`, `Lab`, `Access` e `Audit`.
+- `ProjectsPage.tsx` tambem expoe links diretos para essas areas sem considerar readiness/job ativo.
+- Hoje apenas `LabPage.tsx` consulta `training/readiness`; as demais telas nao fazem gate.
+
+23. **O endpoint de job existe, mas a implementacao atual nao sustenta um monitor confiavel**
+- `GET /projects/{project_id}/training/jobs/{job_id}` le apenas do dicionario em memoria `_jobs` no `TrainingOrchestrator`.
+- Isso significa: perda de estado apos restart, nenhuma retomada em reload de pagina, nenhum historico por projeto e nenhum progresso intermediario persistido.
+- A tabela `project_training_jobs` existe no schema, mas nao esta sendo usada pelo orquestrador.
+
+24. **As acoes de treinamento do setup estao semanticamente incompletas**
+- `training/reset-and-regenerate` chama apenas `start_discovery`, embora o plano/prompt esperem pipeline completo `discovery + questions + build + publish`.
+- `training/retrain-existing` chama apenas `start_build`, sem publicacao automatica da versao.
+- Isso pode explicar a percepcao de "terminou sem indicacao" e tambem gaps de readiness apos o suposto treinamento.
+
+25. **Audit nao deve ser tratado como substituto do monitor de treino**
+- `AuditPage.tsx` lista eventos operacionais do projeto, mas nao e um feed job-scoped nem realtime.
+- Ela pode complementar a rastreabilidade, mas nao resolve sozinha status/progresso/log de treinamento.
+
+## Implementacao aplicada na rodada atual (2026-03-06)
+
+26. **O pipeline do setup agora executa o fluxo completo esperado**
+- `training/reset-and-regenerate` passou a disparar `discovery -> questions -> build -> publish`.
+- `training/retrain-existing` passou a disparar `build -> publish`.
+
+27. **Jobs de treinamento agora sao persistidos no banco com eventos consultaveis**
+- Novo store: `app/modules/training/job_store.py`.
+- `project_training_jobs` passou a ser usado como fonte real de status.
+- Nova tabela `project_training_job_events` registra o log estruturado por job.
+- `TrainingOrchestrator` deixou de depender de `_jobs` em memoria.
+
+28. **Foi criado um estado unificado de treinamento para a UI**
+- Novo endpoint: `GET /projects/{project_id}/training/state`.
+- Novo endpoint: `GET /projects/{project_id}/training/jobs/{job_id}/events`.
+- O estado consolida:
+  - readiness do dataset ativo;
+  - job ativo;
+  - ultimo job;
+  - liberacao por secao (`metadata`, `questions`, `lab`, `access`, `audit`);
+  - mensagem de bloqueio/andamento.
+
+29. **A UI passou a bloquear e monitorar o workspace com base no estado real**
+- `ProjectSetupPage` agora mostra:
+  - card de monitoramento do job;
+  - progresso por etapa;
+  - ultimo status/falha;
+  - modal para acompanhar o log do job.
+- `ProjectWorkspaceNav` e `ProjectsPage` passaram a desabilitar `Metadata`, `Questions` e `Lab` enquanto:
+  - nao existe treino concluido/publicado; ou
+  - existe job de treinamento em andamento.
+- `Audit` e `Access` permaneceram acessiveis.
+
+30. **As paginas operacionais passaram a respeitar o gate de treinamento**
+- `MetadataPage`, `QuestionsPage` e `LabPage` agora usam o mesmo estado central via polling.
+- `LabPage` deixou de depender apenas de `training/readiness`, cobrindo tambem o caso de retreinamento em andamento com dataset ativo anterior.

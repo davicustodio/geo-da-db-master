@@ -211,3 +211,45 @@
 - `api-geo-nlp`: `57b1f8c` (`feat: finish module3 control plane and access runtime`)
 - Mantidas fora dos commits:
   - delecoes antigas em `api-geo-nlp/docs/workflow_runtime_20x_*`
+
+### [Concluido] Analise do fluxo de treinamento e gating de workspace
+- Inspecionados:
+  - `ai-data-pilot-manager/src/pages/ProjectSetupPage.tsx`
+  - `ai-data-pilot-manager/src/components/ProjectWorkspaceNav.tsx`
+  - `ai-data-pilot-manager/src/pages/MetadataPage.tsx`
+  - `ai-data-pilot-manager/src/pages/QuestionsPage.tsx`
+  - `ai-data-pilot-manager/src/pages/LabPage.tsx`
+  - `ai-data-pilot-manager/src/pages/AuditPage.tsx`
+  - `api-geo-nlp/app/api/routes/control_plane.py`
+  - `api-geo-nlp/app/api/routes/training.py`
+  - `api-geo-nlp/app/modules/training/orchestrator.py`
+- Conclusoes principais:
+  - a UI nao faz acompanhamento de job;
+  - a API expoe `GET /training/jobs/{job_id}`, mas o job fica apenas em memoria;
+  - `project_training_jobs` existe no banco e nao esta sendo usado;
+  - `reset-and-regenerate` e `retrain-existing` executam pipelines parciais frente ao comportamento esperado no plano;
+  - `Audit` deve permanecer acessivel como trilha operacional, enquanto `Metadata`, `Questions` e `Lab` devem ser gated por estado real do treinamento.
+
+### [Concluido] Implementacao do monitor persistente de treinamento
+- Backend:
+  - criado `app/modules/training/job_store.py`;
+  - `TrainingOrchestrator` refatorado para jobs persistidos e log estruturado;
+  - `training/reset-and-regenerate` agora executa pipeline completo;
+  - `training/retrain-existing` agora executa `build + publish`;
+  - novos endpoints:
+    - `GET /projects/{project_id}/training/state`
+    - `GET /projects/{project_id}/training/jobs/{job_id}/events`
+  - `project_training_jobs` ganhou `created_at`/`updated_at`;
+  - nova tabela `project_training_job_events`.
+- Frontend:
+  - criado hook `useProjectTrainingState`;
+  - criado modal `TrainingJobLogModal`;
+  - `ProjectSetupPage` passou a monitorar job ativo/ultimo job;
+  - `ProjectWorkspaceNav` e `ProjectsPage` passaram a bloquear `Metadata`, `Questions` e `Lab`;
+  - `MetadataPage`, `QuestionsPage` e `LabPage` passaram a usar o gate central.
+
+### [Concluido] Validacoes desta rodada
+- `python3 -m compileall app` em `api-geo-nlp` -> ok
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -p pytest_asyncio tests/unit/test_training_state.py tests/unit/test_artifact_store.py -q` -> `10 passed`
+- `npm test` em `ai-data-pilot-manager` -> ok
+- `npm run build` em `ai-data-pilot-manager` -> ok
