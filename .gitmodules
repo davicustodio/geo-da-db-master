@@ -1,3 +1,6 @@
 [submodule "api-geo-nlp"]
 	path = api-geo-nlp
 	url = https://gitlab.cnpm.embrapa.br/davi/api-geo-nlp.git
+[submodule "ai-data-pilot-manager"]
+	path = ai-data-pilot-manager
+	url = https://gitlab.cnpm.embrapa.br/davi/ai-data-pilot-manager.git
