@@ -258,6 +258,45 @@
 - Ou seja: o gargalo deixou de estar em `generate_candidates` para esse cenário; o tempo dominante passou a ser custo/execução SQL e ranking.
 
 ## Decisão técnica
+
+## Nova otimização alinhada à documentação do Vanna
+- Em `2026-03-11`, foi adicionado um fast path intermediário para o fluxo `similar question -> fast adaptation from memory`, antes da hidratação completa do Vanna legado.
+- A implementação usa apenas artefatos já publicados do projeto ativo:
+  - memória vetorial (`qa` + `feedback` validado) para recuperar exemplos Q→SQL semelhantes;
+  - chunks semânticos (`ddl` + `dictionary`) para grounding mínimo do prompt.
+- O novo caminho só é acionado quando:
+  - não há match exato;
+  - existem exemplos selecionáveis pelo filtro de aderência do prompt;
+  - a similaridade da melhor pergunta publicada cruza o limiar de segurança.
+- Quando esse fast path gera SQL aderente, o runtime retorna sem:
+  - hidratar a instância completa do Vanna;
+  - consultar `vn.get_similar_question_sql()`;
+  - entrar no fallback profundo.
+
+## Evidência prática do novo caminho
+- Validação unitária:
+  - `25 passed` em `tests/unit/test_vanna_agent_relevance.py`;
+  - `6 passed` em `tests/unit/test_runtime_intent_classification.py`.
+- Validação HTTP real na pergunta:
+  - `me mostre os produtos da categoria pecuaria que cresceram no valor de producao entre 2018 e 2019`
+- Resultado observado:
+  - `selected_source = memory_adaptation_fast_path`
+  - `llm_calls = ['generate_sql_memory_fast_path']`
+  - `total_backend_ms = 6769.67` no primeiro hit frio medido.
+- Após a pergunta entrar no cache de candidatos por versão semântica:
+  - nova execução da mesma pergunta caiu para `~508ms` de backend;
+  - `R2.candidate_cache_hit` apareceu;
+  - `llm_calls = []`.
+
+## Leitura técnica consolidada
+- O runtime agora está mais próximo da recomendação do Vanna:
+  - `match exato` -> reutilização direta;
+  - `pergunta semelhante` -> adaptação rápida guiada por memória;
+  - `pergunta nova` -> investigação mais profunda com contexto semântico / Vanna legado.
+- A otimização continua genérica:
+  - não depende de `datahub2`;
+  - não codifica nomes fixos de tabela/coluna;
+  - usa apenas o schema semântico ativo e a memória publicada do projeto corrente.
 - A solução efetiva para o gargalo principal não é apenas trocar modelo ou reduzir prompt.
 - O maior ganho veio de reduzir o domínio de perguntas que realmente precisam de inferência LLM.
 - Para o `datahub2`, a direção correta é expandir os fast paths determinísticos para:
@@ -438,3 +477,116 @@
   - nos casos estáveis, `db_total_ms` ficou em ~`827.72ms`, bem abaixo de `llm_total_ms`;
   - no pior caso isolado, `db_ms = 641.86ms`, ainda muito abaixo de `llm_total_ms = 16196.42`.
 - `R1.classify_intent` deixou de ser relevante no estado atual do código medido (`~0.03ms`), então o foco deve ficar em reduzir chamadas/modelos/fallback dentro de `generate_sql_candidates`.
+
+## Reprodução do desvio como `ui_command`
+- Em `2026-03-11`, o caso reportado foi reproduzido via UI local autenticada com `davi.custodio@embrapa.br`.
+- Pergunta usada: `me de a lista de cidades do estado de santa catarina`.
+- Resultado exibido no Lab:
+  - mensagem principal: `Comando de UI detectado. Encaminhando para Módulo 2.`
+  - nenhum SQL foi exibido/gerado.
+- Evidência técnica capturada na aba de diagnóstico:
+  - `request_id = 1fbec5ed-fd44-40e1-b48d-1a29b2962a6a`
+  - `R1.classify_intent = 7544.82ms`
+  - `llm classify_intent = 7501.7ms`
+  - provider/model: `openrouter` / `z-ai/glm-4.7-flash`
+  - `stage_diagnostics[1].payload.intent = "ui_command"`
+  - `sql_operations = []`
+- Conclusão inicial da reprodução:
+  - o runtime aborta antes de `generate_sql_candidates()`;
+  - a falha não está no banco nem na ausência de dados, e sim no gate/classificador de intenção que rotula a pergunta analítica como comando de UI.
+
+## Validação do dado e do padrão de falha
+- O projeto `datahub2` possui conexão ativa para o banco `datahub` e a senha armazenada foi validada com sucesso via `decrypt_secret`.
+- Consulta direta no banco do projeto confirmou o dado:
+  - `SELECT COUNT(*) FROM public.municipio WHERE nm_estado = 'SANTA CATARINA'` retornou `295`;
+  - amostra ordenada retornou municípios como `ABDON BATISTA`, `ABELARDO LUZ`, `AGROLÂNDIA`, `AGRONÔMICA`.
+- Reprodução comparativa via API autenticada:
+  - `me de a lista de cidades do estado de santa catarina` -> `intent = ui_command`, sem SQL;
+  - `liste as cidades do estado de santa catarina` -> `intent = ui_command`, sem SQL;
+  - `traga os municipios do estado de santa catarina` -> `intent = ui_command`, sem SQL;
+  - `quais as cidades do estado de santa catarina` -> `intent = analytic_sql`, consulta executada com sucesso.
+- No caso bem-sucedido, a UI exibiu a SQL:
+  - `SELECT nm_municip FROM public.municipio WHERE nm_estado = 'SANTA CATARINA';`
+- O diferencial entre falha e sucesso está no prefixo linguístico:
+  - formas interrogativas com `quais` entram na heurística rápida de `analytic_sql`;
+  - formas imperativas (`me de`, `liste`, `traga`) caem no LLM de classificação e podem ser rotuladas incorretamente como `ui_command`.
+
+## Causa raiz no código
+- Em `app/modules/runtime/orchestrator.py`, `_classify_intent()` só classifica como `analytic_sql` por heurística quando encontra pistas como `quais`, `qual`, `ranking`, `total`, `distribu`, `quanto` e similares.
+- A lista de pistas não inclui expressões analíticas básicas em modo imperativo, como `lista`, `liste`, `traga`, `me de`, `mostre`, `retorne`.
+- Quando a heurística falha, o código consulta o LLM leve com um prompt binário (`ui_command` vs `analytic_sql`).
+- Se o LLM responder `ui_command`, ainda existe um override protetor `_looks_analytic_geo_question()`, mas ele reutiliza praticamente a mesma lista estreita de pistas analíticas; como `me de a lista...` não contém `quais/qual/total/...`, o override não aciona mesmo contendo `cidade` e `estado`.
+- Resultado: a pergunta é desviada em `R1`, retorna handoff de UI e nunca chega a `R2.generate_candidates()`, apesar de o banco responder corretamente.
+
+## Lacunas de teste e robustez
+- Não há testes direcionados cobrindo `_classify_intent()` para perguntas analíticas imperativas em português.
+- O custo do erro é alto porque a falsa classificação para `ui_command` impede qualquer tentativa de geração de SQL.
+- O uso de LLM em `R1` introduz latência de vários segundos em perguntas simples e, neste caso, ainda produz falso positivo.
+
+## Implementação da correção
+- Em `2026-03-11`, `_classify_intent()` foi endurecido para:
+  - usar uma lista explícita de comandos reais de UI;
+  - reconhecer perguntas analíticas em português também no modo imperativo (`me de`, `liste`, `traga`, `mostre`, `retorne`, `exiba`, `quero ver`) quando acompanhadas de pistas de domínio;
+  - não aceitar `ui_command` vindo apenas do LLM quando a frase não contiver keyword explícita de interface.
+- Também foi adicionada observabilidade mínima no override de intenção para registrar quando o LLM sugerir `ui_command` sem base lexical explícita.
+- Em `app/integrations/vanna/agent.py`, `_repair_sql_with_known_schema()` passou a normalizar filtros textuais geográficos (`nm_estado`, `nm_regiao`, `nm_municip`, `uf`, `uf_estado`) para comparação case-insensitive via `UPPER(...) = UPPER(...)`.
+
+## Validação pós-correção
+- Testes locais:
+  - `pytest tests/unit/test_runtime_intent_classification.py tests/unit/test_runtime_orchestrator_geo.py tests/unit/test_vanna_agent_relevance.py -q`
+  - resultado: `33 passed`.
+- Revalidação HTTP autenticada após restart da API:
+  - `me de a lista de cidades do estado de santa catarina`
+    - `intent = analytic_sql`
+    - `sql_generated = SELECT nm_municip FROM public.municipio WHERE UPPER(nm_estado) = UPPER('SANTA CATARINA');`
+    - `row_count = 295`
+  - `abra o mapa da camada de soja`
+    - `intent = ui_command`
+    - handoff de UI preservado.
+
+## Otimização genérica de latência para lookup simples
+- Em `2026-03-11`, `generate_sql_candidates()` foi alterado para reconhecer perguntas de lookup de baixa complexidade por forma linguística, sem hardcode de projeto ou schema.
+- Nova estratégia:
+  - para perguntas simples de listagem/lookup, o pipeline tenta primeiro um `semantic_vector_fast_path`;
+  - esse caminho usa apenas os artefatos semânticos ativos do projeto no PgVector (`ddl` + `dictionary`) para montar um prompt direto;
+  - se a SQL resultante for relevante, o pipeline retorna sem hidratar a memória do Vanna nem buscar exemplos similares;
+  - se falhar, o fluxo completo anterior continua disponível.
+- A tentativa de usar primeiro o modelo leve nesse caminho foi medida e descartada porque piorou a latência; o fast path ficou com um único call no modelo `best`.
+
+## Ganho de latência medido na pergunta original
+- Baseline antes da otimização genérica de lookup:
+  - `total_backend_ms = 7638.46`
+  - `llm_total_ms = 3049.71`
+  - `R2.generate_candidates = 7297.69`
+  - uma única chamada `generate_sql_fallback`.
+- Após o `semantic_vector_fast_path`:
+  - `total_backend_ms = 5924.68`
+  - `llm_total_ms = 3923.3`
+  - `R2.generate_candidates = 5440.26`
+  - uma única chamada `generate_sql_semantic_fast_path`
+  - `row_count = 295`
+- Comparando com a primeira reprodução corrigida, o caminho da pergunta original saiu de ~`15.32s` backend para ~`5.92s`, preservando a resposta correta.
+
+## Aderência adicional à direção documentada do Vanna
+- Em `2026-03-11`, o fluxo `memory first` foi reforçado no agente:
+  - busca direta de exemplos `qa`/`feedback` no PgVector antes da hidratação do Vanna;
+  - `exact_training_match` passou a poder retornar diretamente a partir dessa memória vetorial;
+  - cache em memória por `project_id + active_version + normalized_question` foi adicionado para reutilizar candidatos já gerados.
+- A implementação segue a direção observada na documentação do Vanna 2.0:
+  - `similar question -> fast adaptation from memory`;
+  - `novel question -> deeper investigation`.
+
+## Ganho medido com memory-first + cache
+- Medição HTTP real, mesma pergunta executada duas vezes seguidas:
+  - tentativa 1:
+    - `total_backend_ms = 6815.1`
+    - `llm_total_ms = 4189.24`
+    - `row_count = 295`
+  - tentativa 2:
+    - `total_backend_ms = 512.35`
+    - `llm_total_ms = 0`
+    - `cache_hit` presente
+    - `row_count = 295`
+- Conclusão prática:
+  - cold path caiu de ~`15.3s` para ~`6.8s`;
+  - warm path repetido caiu para ~`0.5s` sem nova chamada LLM.

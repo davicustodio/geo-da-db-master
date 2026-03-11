@@ -165,3 +165,62 @@
     - `avg_backend_ms ~ 526.72`
     - `R2.generate_candidates ~ 6.1ms`
     - `llm_total_ms = 0`
+- Em `2026-03-11`, foi iniciada a investigação de uma pergunta simples do Lab que não gerou SQL.
+- A reprodução ponta a ponta na UI local com `davi.custodio@embrapa.br / 123456` confirmou que a pergunta `me de a lista de cidades do estado de santa catarina` foi desviada para `ui_command` antes da geração de SQL.
+- Evidência registrada:
+  - resposta visual: `Comando de UI detectado. Encaminhando para Módulo 2.`
+  - `request_id = 1fbec5ed-fd44-40e1-b48d-1a29b2962a6a`
+  - `R1.classify_intent ~ 7.54s`
+  - sem operações SQL no timing/diagnóstico.
+- Na sequência, a mesma intenção foi reexecutada com variações linguísticas via API autenticada:
+  - `me de a lista...`, `liste...` e `traga...` -> `ui_command`;
+  - `quais as cidades...` -> `analytic_sql`.
+- A UI exibiu SQL válida para a formulação com `quais`:
+  - `SELECT nm_municip FROM public.municipio WHERE nm_estado = 'SANTA CATARINA';`
+- A conexão ativa do projeto `datahub2` foi validada e a consulta direta no banco do projeto confirmou `295` municípios em `SANTA CATARINA`.
+- Conclusão do diagnóstico:
+  - a falha está em `_classify_intent()` / `_looks_analytic_geo_question()` no backend;
+  - o banco e a modelagem do projeto suportam a pergunta;
+  - existe risco aberto para toda a classe de perguntas analíticas formuladas no imperativo.
+- Em `2026-03-11`, a correção foi implementada no backend:
+  - `RuntimeOrchestrator._classify_intent()` passou a distinguir melhor comandos explícitos de UI de pedidos analíticos imperativos;
+  - `run_vanna_prompt()` deixou de decidir `ui_command` sozinho quando não houver keyword explícita de interface;
+  - `_repair_sql_with_known_schema()` passou a normalizar filtros geográficos textuais para comparação case-insensitive.
+- Nova cobertura de testes adicionada para:
+  - `me de`, `liste`, `traga`, `mostre` -> `analytic_sql`;
+  - `abra o mapa...` -> `ui_command`;
+  - override de `ui_command` vindo do LLM sem evidência lexical de interface.
+- Validação local concluída:
+  - `33 passed` nos testes unitários direcionados.
+- Validação HTTP real concluída após restart da API:
+  - a pergunta original `me de a lista de cidades do estado de santa catarina` agora retorna `intent=analytic_sql`, SQL gerada e `row_count=295`;
+  - o comando explícito `abra o mapa da camada de soja` continua retornando `ui_command`.
+- Em `2026-03-11`, a redução adicional de latência foi implementada sem hardcode de projeto:
+  - `generate_sql_candidates()` ganhou um `semantic_vector_fast_path` para perguntas de lookup simples;
+  - esse caminho usa apenas chunks semânticos ativos (`ddl` + `dictionary`) via PgVector antes de hidratar o Vanna;
+  - se a SQL for aderente, o pipeline encerra ali; se não for, cai no fluxo completo já existente.
+- Foi testada uma variante com modelo leve no fast path, mas ela piorou o tempo da pergunta original; a mudança foi revertida na mesma sessão.
+- Validação final via HTTP real na pergunta original:
+  - `total_backend_ms` caiu para `5924.68`;
+  - `R2.generate_candidates` caiu para `5440.26`;
+  - permaneceu apenas uma chamada LLM;
+  - `row_count = 295`.
+- Em `2026-03-11`, o fluxo foi aprofundado na direção documentada do Vanna:
+  - `generate_sql_candidates()` agora consulta primeiro a memória vetorial (`qa` + `feedback`) do projeto ativo;
+  - `exact_training_match` pode ser resolvido antes de hidratar Vanna;
+  - foi adicionado cache em memória por `project_id + active_version + normalized_question`.
+- Validação HTTP real em duas execuções seguidas da mesma pergunta:
+  - tentativa 1: `total_backend_ms = 6815.1`, `llm_total_ms = 4189.24`, `row_count = 295`;
+  - tentativa 2: `total_backend_ms = 512.35`, `llm_total_ms = 0`, `row_count = 295`.
+- Em `2026-03-11`, foi implementado o passo seguinte da direção documentada:
+  - `generate_sql_candidates()` agora tenta `memory_adaptation_fast_path` para perguntas semelhantes, usando exemplos Q→SQL recuperados da memória vetorial antes de carregar a instância completa do Vanna;
+  - o fast path é ancorado com poucos chunks `ddl` + `dictionary` do projeto ativo e só retorna quando a SQL gerada passa no filtro de aderência.
+- Cobertura adicional criada:
+  - teste unitário garantindo que `memory_adaptation_fast_path` execute antes de `get_vanna_for_project()` quando houver pergunta semelhante;
+  - `python3 -m py_compile` passou;
+  - `./.venv/bin/pytest tests/unit/test_vanna_agent_relevance.py -q` passou com `25 passed`;
+  - `./.venv/bin/pytest tests/unit/test_runtime_intent_classification.py -q` passou com `6 passed`.
+- Validação HTTP real após restart da API:
+  - pergunta `me mostre os produtos da categoria pecuaria que cresceram no valor de producao entre 2018 e 2019` retornou `selected_source = memory_adaptation_fast_path`;
+  - nesse primeiro hit frio, `total_backend_ms = 6769.67` e houve uma única chamada `generate_sql_memory_fast_path`;
+  - em execuções subsequentes da mesma pergunta, o cache por versão assumiu o controle e o backend caiu para `~508ms`, sem nenhuma chamada LLM.

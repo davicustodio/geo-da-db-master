@@ -91,6 +91,24 @@ Analisar a arquitetura atual do projeto, com foco na API `api-geo-nlp` e no pipe
 - [x] Executar bateria controlada de medicao e consolidar `p50/p95/% total`.
 - [ ] Rodar testes A/B para identificar chamadas LLM desnecessarias.
 
+## Follow-up: diagnostico de pergunta simples desviada como `ui_command`
+- [x] Reproduzir a falha no Lab com o usuario `davi.custodio@embrapa.br`.
+- [x] Correlacionar a resposta do Lab com a classificacao de intencao e a rota backend usada.
+- [x] Validar se a pergunta deveria ser atendida pelo corpus/dados do projeto `datahub2`.
+- [x] Identificar a causa raiz no classificador/gates anteriores a geracao de SQL.
+- [x] Consolidar plano de correcao obrigatorio para evitar ausencia de resposta em perguntas semelhantes.
+- [x] Implementar endurecimento de `_classify_intent()` para perguntas analiticas imperativas.
+- [x] Cobrir o classificador com testes unitarios.
+- [x] Normalizar filtros textuais geograficos para comparacao case-insensitive no reparo de SQL.
+- [x] Validar a frase original via HTTP real e confirmar que o comando de UI explicito continua preservado.
+- [x] Reduzir latencia de lookup simples sem hardcode de schema/projeto.
+- [x] Introduzir fast path generico baseado apenas em contexto semantico do projeto ativo.
+- [x] Validar ganho de latencia via HTTP real na pergunta original.
+- [x] Priorizar Tool Memory vetorial antes da hidratacao completa do Vanna.
+- [x] Adicionar fast path de adaptacao para perguntas semelhantes a partir da memoria vetorial publicada.
+- [x] Adicionar cache por versao semantica ativa + pergunta normalizada.
+- [x] Medir cold path vs warm path com repeticao real da mesma pergunta.
+
 ## Decisions
 - Tratar o problema do Lab como falha combinada de corpus, recuperação, ranqueamento e aprendizado automático, não como erro isolado da tela.
 - Priorizar remoção do aprendizado automático não validado (`runtime_auto`) antes de qualquer novo retraining, porque ele contamina a memória vetorial e mascara a qualidade do corpus curado.
