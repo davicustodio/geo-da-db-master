@@ -1,6 +1,14 @@
 # Progress Log
 
 ## Session Log
+- Em `2026-03-11`, foi analisada a arquitetura atual do projeto para preparar uma apresentacao executiva/didatica sobre a estrategia NLP2SQL.
+- Foram revisados os pontos principais da API `api-geo-nlp`, especialmente:
+  - `POST /projects/{project_id}/ask`;
+  - `RuntimeOrchestrator`;
+  - pipeline de ranking/validacao de SQL;
+  - integracao com Vanna;
+  - pipeline em duas etapas de base semantica + embeddings.
+- Foi consolidado um plano de apresentacao em `docs/plano-apresentacao-nlp2sql-15min.md`, com 10 slides recomendados, roteiro de tempo e linguagem simplificada para publico leigo.
 - Implementado o modelo de duas etapas no backend e frontend.
 - O pipeline inicial agora termina na base semântica; a geração de embeddings virou ação separada.
 - Foi adicionada a confirmação explícita de revisão da base semântica.
@@ -68,3 +76,92 @@
   - primeiro request após restart: ~`14.5s`;
   - request subsequente: ~`10.3s`;
   - execução SQL observada: entre ~`0.34s` e ~`3.25s` conforme aquecimento/candidato selecionado.
+- Em `2026-03-11`, foi feita análise cruzada UI/API para o novo problema de performance do `Lab` com perguntas geográficas.
+- Foi confirmado que:
+  - o botão `Ver payload geo` é o único consumidor de `result.geo` na UI atual;
+  - o backend monta `GeoJSON` inline no `ask` quando detecta geometria;
+  - a tabela do `Lab` renderiza qualquer coluna retornada, inclusive `geom`;
+  - o contrato já possui `modalities`, suficiente para indicar que a resposta sugere `texto`, `tabela`, `grafico` e/ou `mapa`.
+- Direção consolidada para o próximo passo:
+  - remover o uso de payload geográfico do fluxo principal do `Lab`;
+  - nunca expor colunas geoespaciais na tabela de resposta;
+  - substituir o botão/modal geográfico por indicação leve de modalidade;
+  - complementar com métricas por etapa para comprovar o ganho de latência.
+- Em `2026-03-11`, o plano foi refinado com um requisito adicional de produto:
+  - a API deve suportar explicitamente consultas com ou sem retorno de `geom`, dependendo do consumidor;
+  - o `Lab` passa a ser apenas um consumidor do modo “sem geometria”;
+  - integrações futuras com geração de GeoJSON, `maps-api` e WMS permanecem suportadas pelo modo “com geometria”.
+- Implementação concluída em `2026-03-11`:
+  - backend: `geometry_mode` adicionado ao runtime e propagado para transportes Vanna;
+  - backend: SQL/resultset adaptados para excluir geometrias quando solicitado;
+  - frontend: `Lab` fixado em `geometry_mode='exclude'`;
+  - frontend: botão/modal geo removidos, com badges de modalidade no lugar;
+  - testes backend e frontend direcionados passaram;
+  - `npm run build` do manager passou.
+- Em `2026-03-11`, foi consolidado o plano técnico da próxima frente de trabalho para observabilidade do `Perguntar`.
+- O fluxo confirmado para instrumentação é:
+  - `LabPage.tsx` -> `client.ts::ask()` -> `http.ts` -> `/projects/{project_id}/ask` -> `RuntimeOrchestrator.ask()`.
+- Foram identificados como pontos centrais de coleta:
+  - `RuntimeOrchestrator.ask()` para spans de etapa;
+  - `run_vanna_prompt()` para inferência LLM;
+  - `generate_sql_candidates()` para geração/fallback;
+  - `rank_sql_candidates()` para custo e score;
+  - `SqlExecutionService` / `CostEstimator` para banco.
+- A direção definida é implementar um coletor de métricas por request com correlação entre UI, API e auditoria, em vez de logs soltos por função.
+- Implementação da observabilidade concluída em `2026-03-11`:
+  - backend: `request_id` propagado via `AskRequest.request_context.metadata`, `AskResponse` e auditoria;
+  - backend: novo coletor `RuntimeMetricsCollector` criado para spans, chamadas LLM e operações SQL;
+  - backend: `AskResponse` passou a suportar `timing` com resumo e detalhes quando `include_timing_summary=true`;
+  - backend: `RuntimeOrchestrator`, `run_vanna_prompt`, `generate_sql_candidates`, `rank_sql_candidates`, `CostEstimator` e `SqlExecutionService` passaram a registrar tempos;
+  - frontend: `ask()` passou a gerar `request_id`, enviar `x-request-id` e anexar `client_metrics.http_roundtrip_ms`;
+  - frontend: `LabPage` passou a registrar `click_to_response_ms` e a exibir `request_id`, `client_metrics`, `timing` e `stage_diagnostics` na aba de diagnósticos.
+- Validação técnica da implementação:
+  - `python3 -m py_compile` passou nos arquivos Python alterados;
+  - `npm test -- --run src/__tests__/api-client.contract.test.ts src/__tests__/lab-page.test.tsx` passou;
+  - `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest ...` executou os testes síncronos/puros, mas pulou os assíncronos por ausência do plugin de async no ambiente.
+- Em `2026-03-11`, foi implementado o harness da próxima etapa de medição:
+  - script `api-geo-nlp/scripts/benchmark_ask_runtime.py` para executar bateria controlada contra a API;
+  - suporte a perguntas inline ou arquivo JSON de cenários;
+  - medição de `http_roundtrip`, `end_to_end`, `total_backend`, `llm_total`, `db_total`, `geo_total`, spans, chamadas LLM e operações SQL;
+  - consolidação automática de `avg/p50/p95/% total` por cenário, etapa, chamada LLM e operação SQL;
+  - suporte a respostas síncronas e em background com polling;
+  - geração opcional de saída em JSON e Markdown.
+- Também foi adicionado `api-geo-nlp/scripts/benchmark_questions.example.json` com cenários iniciais de referência.
+- Em `2026-03-11`, o benchmark foi executado de fato no projeto `datahub2`.
+- Como a instância HTTP em `:8000` não devolvia `timing` e instâncias HTTP frescas ficaram inconsistentes no startup, a medição consolidada foi feita com `scripts/benchmark_ask_runtime.py --mode direct`, chamando o `RuntimeOrchestrator` do código atual diretamente.
+- Resultados principais observados:
+  - smoke `quais as 10 cidades que mais produzem soja`: `end_to_end_ms ~ 10.29s`, `llm_total_ms ~ 7.03s`, `db_total_ms ~ 0.59s`, `R2.generate_candidates ~ 9.05s`;
+  - lote estável (`ranking-soja-nacional` + `total-acai-norte`): `avg_end_to_end_ms ~ 7.25s`, `avg_backend_ms ~ 7.18s`, `avg_llm_ms ~ 5.93s`, `avg_db_ms ~ 0.83s`;
+  - pior caso isolado (`distribuicao-por-estado`): amostra contada em `~21.78s`, com `llm_total_ms ~ 16.20s` e `db_ms ~ 0.64s`.
+- Conclusão prática validada no projeto:
+  - o gargalo dominante está em `R2.generate_candidates` / `generate_sql`;
+  - o banco não é o principal limitador;
+  - cenários de baixa aderência entram em fallback prolongado e tornam o runtime instável/lento.
+- Em `2026-03-11`, foi implementado um bypass determinístico em `api-geo-nlp/app/integrations/vanna/agent.py` para reduzir dependência de LLM:
+  - `exact_training_match` para reutilizar SQL validada em perguntas idênticas;
+  - `geo_rule_fast_path` para rankings, totais e distribuições geo-analíticas simples.
+- As heurísticas foram ajustadas para reconhecer melhor:
+  - frases como `que mais produzem soja`;
+  - distinção entre `valor total da produção` e `quantidade produzida`;
+  - `distribuição` como intenção agregadora genérica, sem bloquear a aderência da SQL.
+- Testes direcionados passaram:
+  - `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest api-geo-nlp/tests/unit/test_vanna_agent_relevance.py -q`
+  - `python3 -m py_compile api-geo-nlp/app/integrations/vanna/agent.py api-geo-nlp/tests/unit/test_vanna_agent_relevance.py`
+- Revalidação com benchmark direto no `datahub2` após a mudança:
+  - `quais as 10 cidades que mais produzem soja`: de `~10.29s` para `~1.66s` médio, com `llm_total_ms = 0`;
+  - `qual a distribuicao do valor total da producao por estado`: de `~21.78s` pior caso medido para `~1.49s` médio, com `llm_total_ms = 0`.
+- Conclusão operacional do ciclo:
+  - o gargalo principal foi mitigado nos cenários geo-analíticos simples;
+  - o próximo alvo, se necessário, é aplicar a mesma estratégia a outras classes frequentes antes de considerar troca de modelo/provedor.
+- Em `2026-03-11`, foi aplicada uma otimização adicional no pipeline:
+  - `generate_sql_candidates()` agora tenta `geo_rule_fast_path` antes de carregar Vanna/memória vetorial;
+  - `PgVectorStore` e `dataset_version` passam a ser criados apenas no fallback contextual.
+- Foi adicionado teste de contrato garantindo que o fast path não carregue Vanna desnecessariamente.
+- Validação após lazy init:
+  - `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest api-geo-nlp/tests/unit/test_vanna_agent_relevance.py -q`
+  - `python3 -m py_compile api-geo-nlp/app/integrations/vanna/agent.py api-geo-nlp/tests/unit/test_vanna_agent_relevance.py`
+  - benchmark direto `quais as 10 cidades que mais produzem soja`:
+    - `avg_end_to_end_ms ~ 575.93`
+    - `avg_backend_ms ~ 526.72`
+    - `R2.generate_candidates ~ 6.1ms`
+    - `llm_total_ms = 0`

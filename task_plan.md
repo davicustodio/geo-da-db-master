@@ -7,12 +7,18 @@ Implementar o redesenho em duas etapas do pipeline:
 
 O entregável inclui backend, frontend e testes atualizados.
 
+## Goal (2026-03-11 - Apresentação)
+Analisar a arquitetura atual do projeto, com foco na API `api-geo-nlp` e no pipeline baseado em Vanna AI, para montar um plano de apresentação de 15 minutos em linguagem acessível para público leigo.
+
 ## Phases
 - [x] Mapear o fluxo atual de setup, treinamento, curadoria e lab.
 - [x] Definir o modelo-alvo em `api-geo-nlp/docs/plano-ui-pipeline-duas-etapas.md`.
 - [x] Separar backend em estado de base semântica e estado de embeddings.
 - [x] Ajustar a UI para refletir as duas etapas e a dependência entre elas.
 - [x] Atualizar testes e executar verificações principais.
+- [x] Mapear o fluxo real do runtime (`/ask`) e do pipeline de preparo semântico/embeddings.
+- [x] Consolidar a mensagem principal para público leigo.
+- [x] Definir sequência de slides, tempo por slide e mensagem-chave para apresentação de 15 minutos.
 
 ## Decisions
 - Usar o skill `planning-with-files` porque a tarefa é de organização e definição estratégica.
@@ -59,6 +65,31 @@ O entregável inclui backend, frontend e testes atualizados.
 - [x] Substituir o prompt legado por um prompt contextual com instrução explícita de adaptação à pergunta atual.
 - [x] Limpar feedbacks `runtime_auto` persistidos do `datahub2`.
 - [x] Revalidar o fluxo via API autenticada após reiniciar o backend local.
+
+## Follow-up: performance do Lab para perguntas com resultado geografico
+- [x] Mapear onde o `Lab` renderiza tabela, grafico e payload geoespacial.
+- [x] Mapear no runtime onde `geom` e `GeoJSON` entram no fluxo síncrono e em background.
+- [x] Confirmar se a UI depende do payload `geo` para algo além do botão/modal atual.
+- [x] Confirmar se o contrato atual já expõe `modalities` para indicar tipo de resultado.
+- [x] Consolidar o novo requisito de contrato: a API precisa aceitar modo com e sem retorno de geometria.
+- [x] Definir o contrato novo do runtime (`AskRequest`) para controlar retorno de colunas geoespaciais.
+- [x] Definir o corte de escopo do `Lab`: usar sempre o modo sem retorno de geometria.
+- [x] Definir sanitização obrigatória de colunas geoespaciais na tabela retornada quando o modo sem geometria estiver ativo.
+- [x] Definir ajustes de UX para indicar modalidades previstas/retornadas sem modal geográfico.
+- [x] Definir propagação do novo parâmetro para `/projects/{project_id}/ask` e transportes Vanna nativos (SSE, WebSocket, polling).
+- [x] Definir pacote mínimo de testes e métricas para validar ganho de latência.
+
+## Follow-up: observabilidade detalhada do `Perguntar`
+- [x] Mapear o fluxo ponta a ponta do clique em `Perguntar` ate `/projects/{project_id}/ask`.
+- [x] Confirmar os pontos atuais de custo provavel no runtime (`_classify_intent`, `generate_sql_candidates`, `rank_sql_candidates`, `_suggest_chart_with_vanna`, SQL, geo e serializacao).
+- [x] Definir o plano tecnico de instrumentacao ponta a ponta para separar UI, rede, backend, LLM, banco e payload.
+- [x] Implementar correlacao por `request_id` entre UI, API e auditoria.
+- [x] Adicionar spans/metricas por etapa no runtime do backend.
+- [x] Instrumentar chamadas LLM e SQL em wrappers centrais.
+- [x] Expor metricas no contrato de debug e na auditoria.
+- [x] Implementar harness/script para executar bateria controlada e consolidar `avg/p50/p95/% total`.
+- [x] Executar bateria controlada de medicao e consolidar `p50/p95/% total`.
+- [ ] Rodar testes A/B para identificar chamadas LLM desnecessarias.
 
 ## Decisions
 - Tratar o problema do Lab como falha combinada de corpus, recuperação, ranqueamento e aprendizado automático, não como erro isolado da tela.
