@@ -9,3 +9,62 @@
 - Testes direcionados do backend passaram.
 - Build do frontend passou.
 - Lint do frontend não pôde rodar por ausência de `eslint` no ambiente.
+- Reprodução operacional realizada em `2026-03-11` com login de projeto real via UI local.
+- Nova tentativa de `Gerar embeddings` no projeto `datahub2` gerou o job `d9d1058b-3ce0-4f6a-a343-f7ec4898f270` e falhou com a mesma mensagem do job anterior.
+- Foi executado um script local usando `TrainingOrchestrator._build_runtime_sql_validator` para validar todas as `questions` da versão `20260311T120841Z`.
+- Resultado do script: apenas 1 SQL falha em runtime; pergunta `id=388`, relacionada à participação da região Norte na produção de açaí.
+- A causa raiz é uma subquery com correlação inválida (`p.nome_produto`) que dispara `GroupingError` no `EXPLAIN`.
+- A `question 388` foi corrigida operacionalmente via API e passou a ficar com `sql_is_valid = true`.
+- O backend foi ajustado para persistir `quality_report` e `quality_failure` mesmo quando o build falha.
+- O gate de qualidade agora bloqueia explicitamente questions previamente marcadas como inválidas e preserva detalhes de runtime por pergunta.
+- O frontend foi ajustado para mostrar diagnóstico no monitor/log e resumo de questions inválidas na curadoria.
+- Testes direcionados passaram:
+  - backend: `./.venv/bin/pytest tests/unit/test_quality_gate.py tests/unit/test_training_orchestrator.py -q`
+  - frontend: `npm test -- --run src/__tests__/training-job-log-modal.test.tsx src/__tests__/project-setup-page.test.tsx src/__tests__/questions-page.test.tsx`
+  - frontend build: `npm run build`
+- Revalidação real concluída:
+  - revisão semântica reconcluída;
+  - novo job `38d0f283-d1a0-4058-a6f4-3b6f10f499de` executado;
+  - quality gate aprovado;
+  - publish concluído com sucesso;
+  - `datahub2` voltou para `ready=true`, `embeddings=published`, `lab=true`.
+- Em `2026-03-11`, o caso do Lab `quais as 10 cidades que mais produzem soja` foi reproduzido via API autenticada com `davi.custodio@embrapa.br`.
+- A API retornou a mesma SQL incorreta vista no Lab, com `MATO GROSSO` e `LIMIT 5`.
+- O `decision_trace` confirmou seleção do candidato `pgvector_memory`.
+- Foi identificado um chunk contaminado em `project_rag_chunks` com `chunk_type='feedback'` e `feedback_by='runtime_auto'` para a própria pergunta testada.
+- O runtime está salvando automaticamente toda resposta em memória vetorial e memória do Vanna sem validação humana, via `RuntimeOrchestrator._save_to_memory`.
+- A função `_is_sql_relevant_to_question()` classificou a SQL incorreta como totalmente aderente (`relevance_score = 1.0`).
+- O ranking privilegiou os 3 primeiros candidatos da memória para cost estimation, o que rebaixou um candidato semanticamente melhor vindo do fallback de contexto.
+- O corpus ativo tem várias questions específicas por estado para soja e não tem um exemplar genérico equivalente para o caso nacional.
+- A latência total da API foi `34.291ms`, enquanto a execução do SQL foi `79.03ms`.
+- A decomposição local por etapa indicou gargalo em chamadas LLM:
+  - classificação: `4344.67ms`
+  - geração de candidatos: `7360.08ms`
+  - sugestão de gráfico: `5512.66ms`
+  - execução SQL: `101.23ms`
+- Foi levantada a documentação oficial do Vanna AI 2.0 e do pacote `vanna==2.0.2` para comparar o fluxo recomendado de Tool Memory/RAG/prompt.
+- A documentação do Vanna 2.0 aponta arquitetura baseada em `Agent + ToolRegistry + AgentMemory`, com `successful interactions` salvas em Tool Memory e adaptação contextual para perguntas similares.
+- O código do projeto não usa `Agent`, `ToolRegistry`, `DefaultLlmContextEnhancer`, `SaveQuestionToolArgsTool` ou `SearchSavedCorrectToolUsesTool`; usa `OpenAI_Chat`/`legacy` com RAG e ranking próprios.
+- Foi inspecionado o método oficial `VannaBase.get_sql_prompt()` do pacote instalado `vanna==2.0.2`.
+- A implementação local de `get_similar_question_sql()` retorna `tuple(question, sql)`, mas o prompt oficial do Vanna espera objetos com chaves `question` e `sql`.
+- Foi gerado o prompt real do `vn.generate_sql()` para a pergunta investigada:
+  - `examples_type = tuple`
+  - `message_count = 2`
+  - nenhum exemplo Q→SQL recuperado entrou no prompt, apenas contexto documental + pergunta.
+- Conclusão registrada: o runtime atual desvia da arquitetura/documentação do Vanna 2.0 e também está incompatível com a forma oficial de injetar exemplos no prompt do Vanna legado.
+- A integração Vanna foi corrigida para:
+  - usar exemplos em formato `{"question","sql"}`;
+  - filtrar exemplos incompatíveis antes do prompt;
+  - substituir o prompt legado por um prompt contextual que explicita que a pergunta atual é a fonte da verdade;
+  - impedir `runtime_auto` no salvamento automático e no resgate de memória.
+- Os chunks `feedback/runtime_auto` contaminados do `datahub2` foram removidos da tabela `project_rag_chunks` (`ids 316, 317, 318, 319`).
+- A API local em `:8000` foi reiniciada e revalidada com `davi.custodio@embrapa.br`.
+- Resultado funcional após correção via HTTP:
+  - `decision_source = vanna_generate_sql`;
+  - SQL sem filtro por `MATO GROSSO`;
+  - `LIMIT 10`;
+  - `R10 = Interacao concluida; memoria depende de feedback validado.`
+- A latência ponta a ponta caiu após cortar chamadas LLM redundantes:
+  - primeiro request após restart: ~`14.5s`;
+  - request subsequente: ~`10.3s`;
+  - execução SQL observada: entre ~`0.34s` e ~`3.25s` conforme aquecimento/candidato selecionado.
