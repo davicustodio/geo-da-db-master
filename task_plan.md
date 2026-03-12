@@ -89,7 +89,18 @@ Analisar a arquitetura atual do projeto, com foco na API `api-geo-nlp` e no pipe
 - [x] Expor metricas no contrato de debug e na auditoria.
 - [x] Implementar harness/script para executar bateria controlada e consolidar `avg/p50/p95/% total`.
 - [x] Executar bateria controlada de medicao e consolidar `p50/p95/% total`.
-- [ ] Rodar testes A/B para identificar chamadas LLM desnecessarias.
+- [x] Rodar testes A/B para identificar chamadas LLM desnecessarias.
+
+## Follow-up: diagnostico da pergunta `qual o bioma que mais produz milho`
+- [x] Reproduzir a pergunta no runtime com `timing` detalhado.
+- [x] Separar cold path, warm path e efeito do cache exato por pergunta.
+- [x] Confirmar quais modelos LLM estao sendo usados para gerar SQL.
+- [x] Medir bootstrap/hidratacao do Vanna e busca vetorial antes da geracao.
+- [x] Testar modelos alternativos configurados para `vn.generate_sql`.
+- [x] Implementar instrumentacao adicional por etapa no runtime.
+- [x] Remover fan-out redundante de modelos quando o primeiro candidato ja for aderente.
+- [x] Implementar estrategia otimizada sem cache semantico para esse tipo de pergunta.
+- [x] Consolidar relatorio persistido em `docs/diagnostico-latencia-lab-milho-2026-03-12.md`.
 
 ## Follow-up: diagnostico de pergunta simples desviada como `ui_command`
 - [x] Reproduzir a falha no Lab com o usuario `davi.custodio@embrapa.br`.
@@ -117,3 +128,4 @@ Analisar a arquitetura atual do projeto, com foco na API `api-geo-nlp` e no pipe
 - Considerar o estado atual como integração híbrida/legada com Vanna 2.0, não como implementação fiel do pipeline oficial do Agent Framework.
 - Tratar como desvio crítico o fato de a memória similar ser usada como SQL candidata direta antes da geração do prompt, porque isso contorna a adaptação contextual que a documentação do Vanna 2.0 descreve.
 - Corrigir a compatibilidade de `get_similar_question_sql()` com o contrato esperado pelo prompt do Vanna legado (`dict` com `question` e `sql`), ou abandonar essa via e migrar explicitamente para o fluxo oficial do Agent/Tool Memory do Vanna 2.0.
+- Para perguntas geo-analiticas simples e recorrentes, priorizar compilacao deterministica por contrato antes de Tool Memory, PgVector e `vanna.generate_sql`.

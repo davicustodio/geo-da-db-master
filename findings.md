@@ -218,6 +218,33 @@
   - a SQL recuperada pode ser escolhida como resposta final sem adaptação contextual do LLM.
 
 ## Conclusão revisada
+
+## Diagnóstico atualizado da pergunta `qual o bioma que mais produz milho` (2026-03-12)
+- O caminho frio real do runtime para essa pergunta confirmou o gargalo no LLM, não no banco.
+- Antes do ajuste atual, o runtime fazia duas chamadas sequenciais a `vanna.generate_sql`:
+  - `google/gemini-3-flash-preview`
+  - `qwen/qwen3.5-flash-02-23`
+- Em medição direta fria, essa duplicação elevava `llm_total_ms` para `~12.1s` e `end_to_end_ms` para `~14.8s`.
+- Depois de interromper o pipeline no primeiro modelo aderente, o caminho frio caiu para `~9.55s`, ainda dominado por uma única chamada LLM (`~6.8s`).
+- Em medição HTTP fria após restart do worker, a única chamada `gemini-3-flash-preview` chegou a `~17.1s`; o tempo de banco permaneceu `~0.32s`.
+- A variância do provedor/modelo explica por que o usuário às vezes percebe tempos muito maiores do que os observados em requests repetidos.
+- A instrumentação agora explicita:
+  - `R2.vanna_instance_init`
+  - `R2.vanna_dataset_hydrate`
+  - `R2.vanna_ready`
+  - `R2.stop_after_relevant_generate_sql`
+- Foi implementado `structured_rule_fast_path` antes de Tool Memory, PgVector e Vanna para perguntas geo-analíticas simples com contrato bem definido.
+- Para a pergunta do milho, o primeiro request HTTP frio após essa mudança caiu para:
+  - `http_roundtrip_ms ~ 645.72`
+  - `total_backend_ms ~ 562.12`
+  - `llm_total_ms = 0`
+  - `db_total_ms ~ 324.97`
+- O warm path com cache exato continuou rápido (`~596ms`), mas deixou de ser a única razão para a boa performance.
+- Microbenchmark com a mesma memória Vanna hidratada mostrou:
+  - `gemini-3-flash-preview`: média `~6.67s`
+  - `qwen/qwen3.5-flash-02-23`: média `~6.96s`
+  - `z-ai/glm-4.7-flash`: amostra isolada `~17.85s`
+- Trocar o modelo, por si só, não resolve o problema estrutural; o ganho real veio do bypass determinístico.
 ## Solução implementada para o gargalo de LLM
 - Em `2026-03-11`, foi implementado um fast path determinístico em `generate_sql_candidates()` para perguntas geo-analíticas simples.
 - A nova estratégia tenta resolver antes do LLM, nesta ordem:

@@ -218,6 +218,38 @@
 - Cobertura adicional criada:
   - teste unitário garantindo que `memory_adaptation_fast_path` execute antes de `get_vanna_for_project()` quando houver pergunta semelhante;
   - `python3 -m py_compile` passou;
+- Em `2026-03-12`, foi aberto o diagnóstico específico da pergunta `qual o bioma que mais produz milho`.
+- A reprodução HTTP no servidor já aquecido mostrou resposta rápida (`~0.8s`) porque o runtime estava usando `R2.candidate_cache_hit`; esse resultado mascarava o cold path real.
+- A medição fria em processo novo mostrou o comportamento real antes do ajuste estrutural:
+  - `~14.8s` fim a fim;
+  - `~12.1s` em duas chamadas LLM (`gemini` + `qwen`);
+  - `~0.41s` no banco.
+- Foi implementada a interrupção após o primeiro `vanna.generate_sql` aderente e adicionados spans para bootstrap do Vanna:
+  - `R2.vanna_instance_init`
+  - `R2.vanna_dataset_hydrate`
+  - `R2.vanna_ready`
+  - `R2.stop_after_relevant_generate_sql`
+- A nova medição fria após esse ajuste caiu para `~9.55s`, ainda dominada por uma única chamada `gemini`.
+- Foi executado microbenchmark direto dos modelos configurados:
+  - `google/gemini-3-flash-preview`: média `~6.67s`;
+  - `qwen/qwen3.5-flash-02-23`: média `~6.96s`;
+  - `z-ai/glm-4.7-flash`: amostra isolada `~17.85s`.
+- Conclusão operacional registrada:
+  - trocar apenas o modelo não resolve o gargalo;
+  - o principal ganho precisa vir de bypass do LLM para classes simples.
+- Em seguida, `generate_sql_candidates()` passou a tentar `structured_rule_fast_path` antes de memória vetorial, Tool Memory e Vanna.
+- A estratégia usa o `QueryContract` e o builder determinístico já existente para perguntas geo-analíticas simples, evitando cache semântico de SQL entre perguntas parecidas.
+- Testes direcionados passaram novamente:
+  - `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ./.venv/bin/pytest tests/unit/test_vanna_agent_relevance.py -q`
+  - `./.venv/bin/python -m py_compile app/integrations/vanna/agent.py tests/unit/test_vanna_agent_relevance.py`
+- A API HTTP foi reiniciada com `API_GEO_NLP_DB_AUTO_INIT_SCHEMA=false` para medir o primeiro request frio do runtime sem custo de bootstrap administrativo de schema.
+- Validação final via HTTP fria após a mudança:
+  - `http_roundtrip_ms ~ 645.72`
+  - `total_backend_ms ~ 562.12`
+  - `llm_total_ms = 0`
+  - `db_total_ms ~ 324.97`
+  - `selected_source = structured_rule_fast_path`
+- Warm path subsequente permaneceu em `~596ms`, agora sem depender exclusivamente do cache exato para apresentar boa performance.
   - `./.venv/bin/pytest tests/unit/test_vanna_agent_relevance.py -q` passou com `25 passed`;
   - `./.venv/bin/pytest tests/unit/test_runtime_intent_classification.py -q` passou com `6 passed`.
 - Validação HTTP real após restart da API:
