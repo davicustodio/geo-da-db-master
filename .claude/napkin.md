@@ -29,6 +29,8 @@
    Do instead: se o banco ja estiver provisionado para teste, subir `api-geo-nlp` com `API_GEO_NLP_DB_AUTO_INIT_SCHEMA=false` antes de investigar rotas ou frontend.
 2. **[2026-03-11] Buscas no monorepo devem evitar `node_modules` e `.venv`**
    Do instead: usar `rg`/`find` com glob de exclusao para reduzir ruido e custo de leitura.
+3. **[2026-03-12] Tool Memory nova nao pode depender do bootstrap global de schema**
+   Do instead: deixar o adapter do Vanna autocriar `project_vanna_tool_memories` e `project_vanna_text_memories` com DDL idempotente quando o backend for usado e o bootstrap geral estiver desligado.
 
 ## Domain Behavior Guardrails
 1. **[2026-03-11] `ui_command` so pode vencer com evidencia lexical explicita**
