@@ -21,6 +21,8 @@
    Do instead: para rankings, totais e distribuicoes geo-analiticas simples, tentar fast path deterministico antes de chamar o LLM.
 7. **[2026-03-11] Fast path perde valor se hidratar Vanna antes**
    Do instead: executar heuristicas deterministicas antes de carregar memoria vetorial, dataset ativo ou instancia Vanna.
+8. **[2026-03-12] Defaults de configuracao devem viver nos arquivos de ambiente**
+   Do instead: remover fallback de `config.py`, wrappers legados e cliente frontend quando a variavel tem valor padrao conhecido, e manter `.env.example`/`.env.template` completos por projeto.
 
 ## Shell & Command Reliability
 1. **[2026-03-11] API local pode travar no bootstrap de schema**
@@ -31,13 +33,17 @@
 ## Domain Behavior Guardrails
 1. **[2026-03-11] `ui_command` so pode vencer com evidencia lexical explicita**
    Do instead: tratar perguntas de dados em modo imperativo (`me de`, `liste`, `traga`, `mostre`) como `analytic_sql` por padrao e usar o LLM apenas como apoio, nunca como decisor unico para handoff de UI.
-2. **[2026-03-11] Tabela do Lab nao deve expor colunas geoespaciais**
+2. **[2026-03-11] Tabela do Lab precisa permitir navegacao sem truncar o dataset**
+   Do instead: renderizar resultados longos em viewport com rolagem vertical/horizontal e preservar acao secundaria de tela cheia apenas como complemento.
+3. **[2026-03-11] Tabela do Lab nao deve expor colunas geoespaciais**
    Do instead: filtrar `geom`/`geometry`/`geojson` na API e manter filtro defensivo tambem na UI.
-3. **[2026-03-11] Modalidades finais ja existem no contrato do runtime**
+4. **[2026-03-11] Corpus curado e memoria de runtime nao devem compartilhar o mesmo CRUD**
+   Do instead: manter `Questions` como editor do corpus treinavel e expor memoria vetorial/feedback em subarea read-only com acoes seguras como promocao ou invalidacao separadas.
+5. **[2026-03-11] Modalidades finais ja existem no contrato do runtime**
    Do instead: reutilizar `modalities` para UX de indicacao de texto/tabela/grafico/mapa antes de criar contrato paralelo.
-4. **[2026-03-11] Controle de retorno de geometria deve ser contratual**
+6. **[2026-03-11] Controle de retorno de geometria deve ser contratual**
    Do instead: introduzir flag/enum no `AskRequest` e propagar para todos os transportes (`/ask`, SSE, WebSocket, polling) em vez de codificar excecoes por tela.
-5. **[2026-03-11] Narrativa do produto deve priorizar texto-para-mapa**
+7. **[2026-03-11] Narrativa do produto deve priorizar texto-para-mapa**
    Do instead: explicar NLP2SQL como mecanismo interno e apresentar o valor principal como transformacao de perguntas em mapas e leitura territorial.
 
 ## User Directives
