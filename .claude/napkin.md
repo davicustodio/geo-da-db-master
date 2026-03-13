@@ -9,24 +9,20 @@
 ## Execution & Validation (Highest Priority)
 1. **[2026-03-12] Cold path do runtime nao pode ser avaliado com cache exato ja aquecido**
    Do instead: medir sempre um request frio em processo novo ou apos restart do worker antes de concluir que a pergunta esta rapida.
-2. **[2026-03-12] Fan-out sequencial de modelos adiciona segundos sem ganho garantido**
-   Do instead: parar apos o primeiro `vanna.generate_sql` aderente e deixar o modelo pesado apenas como fallback para falha ou irrelevancia.
-3. **[2026-03-12] Pergunta geo-analitica simples deve usar compilacao deterministica antes do LLM**
-   Do instead: gerar SQL por contrato estrutural (dimensao, metrica, filtros, limite) antes de Tool Memory, PgVector e Vanna para evitar latencia e erro de cache semantico.
+2. **[2026-03-12] Pipeline de geracao SQL deve ter um unico autor antes da execucao**
+   Do instead: enviar toda pergunta analitica ao `vanna.generate_sql` com o modelo `best` e evitar fast paths, cache exato ou fan-out antes da chamada ao LLM.
+3. **[2026-03-12] Falha de valor canonico nao se corrige com mais heuristica de SQL**
+   Do instead: apos gerar a SQL, fazer grounding de literais usando `project_column_domains.domain_json` para alinhar filtros textuais ao dominio publicado da coluna.
 4. **[2026-03-11] Runtime do Lab tem gargalos fora do SQL**
    Do instead: medir separadamente geracao SQL, execucao SQL, enriquecimento geo e serializacao antes de tratar timeout como problema de banco.
-5. **[2026-03-11] Lookup simples deve tentar contexto semantico antes de hidratar Vanna**
-   Do instead: para perguntas de baixa complexidade, usar primeiro chunks `ddl`/`dictionary` do projeto ativo e so carregar memoria/exemplos do Vanna se a SQL direta nao for aderente.
-6. **[2026-03-11] Pergunta semelhante deve adaptar memoria publicada antes do fallback profundo**
-   Do instead: quando houver exemplo Q→SQL suficientemente similar na memoria vetorial do projeto, montar um prompt curto com esses exemplos + grounding minimo e tentar um `memory_adaptation_fast_path` antes de hidratar o Vanna completo.
-7. **[2026-03-11] Pergunta repetida deve reutilizar candidatos por versao ativa**
-   Do instead: cachear candidatos SQL por `project_id + active_version + pergunta normalizada` para zerar LLM no warm path sem misturar respostas entre versoes semanticas.
+5. **[2026-03-12] Reescrita semantica deve ser conservadora**
+   Do instead: substituir literais somente quando o dominio for publicado/confiavel e o match for unico com alta confianca; se houver ambiguidade, nao reescrever.
+6. **[2026-03-12] Debug de SQL vazia deve separar estrutura de grounding**
+   Do instead: se a SQL parece correta mas retorna zero linhas, validar primeiro se os literais filtrados existem no dominio da coluna antes de mexer no prompt ou no schema.
 8. **[2026-03-11] Pergunta com sinal geografico nao deve implicar payload geo no fluxo principal**
    Do instead: usar sinalizacao leve de modalidade/mapa e gerar payload geografico apenas em fluxo sob demanda.
-9. **[2026-03-11] Gargalo de LLM cai mais com bypass do que com tuning de prompt**
-   Do instead: para rankings, totais e distribuicoes geo-analiticas simples, tentar fast path deterministico antes de chamar o LLM.
-10. **[2026-03-11] Fast path perde valor se hidratar Vanna antes**
-   Do instead: executar heuristicas deterministicas antes de carregar memoria vetorial, dataset ativo ou instancia Vanna.
+7. **[2026-03-12] SQL exibida no Lab deve refletir apenas compilacao estrutural**
+   Do instead: mostrar `sql_original` + `sql_compilada` apenas quando houver adaptacao estrutural real, como remocao de geometria; grounding de dominio nao deve duplicar o bloco de SQL.
 
 ## Shell & Command Reliability
 1. **[2026-03-11] API local pode travar no bootstrap de schema**
@@ -59,3 +55,5 @@
    Do instead: priorizar remocao do payload geo e da exibicao de `geom` no resultado antes de qualquer nova funcionalidade cartografica.
 2. **[2026-03-11] Lab deve operar sem retorno de `geom`, mas a API precisa suportar os dois modos**
    Do instead: tratar o Lab como consumidor com `include_geometry_columns=false` e preservar modo `true` para integracoes que precisem gerar GeoJSON/WMS.
+3. **[2026-03-12] Etapas pre-LLM de geracao SQL foram descartadas por decisao de produto**
+   Do instead: nao reintroduzir fast path deterministico, cache de SQL anterior ou fallback gerador paralelo antes do `best llm` sem aprovacao explicita do usuario.
