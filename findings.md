@@ -1,47 +1,52 @@
 # Findings & Decisions
 
-## Requirements
-- Encontrar a documentacao da API do GeoNode 5 na internet.
-- Verificar a possibilidade de implementar um MCP para interagir com essa API.
-- Gerar um relatorio de diagnostico explicando como isso pode ser feito e como ficaria.
+## Runtime State Atual
+- Perguntas simples com candidato deterministico forte agora pulam o `generate_sql`.
+- Caso medido: `qual o estado com maior producao de uva`.
+- Benchmark aceito:
+  - `avg backend ms`: `1345.41`
+  - `avg llm ms`: `0.00`
+  - `R2.generate_candidates`: `108.36`
+- Warm path observado:
+  - `backend_ms`: `860.18-908.43`
 
-## Research Findings
-- A documentacao oficial relevante para GeoNode 5 esta em `docs.geonode.org`, especialmente a secao `GeoNode API` em `https://docs.geonode.org/en/5.0.x/devel/`.
-- A secao `GeoNode API` lista casos de uso da API v2 para recursos, upload, download, permissoes, assets e linked resources.
-- A documentacao de seguranca mostra que GeoNode usa OAuth2 internamente e menciona `AUTH_IP_WHITELIST` para restringir chamadas REST de usuarios/grupos.
-- No GeoNode 5.x foi introduzido um novo motor de metadados baseado em JSON Schema.
-- A documentacao de design do metadata informa endpoints especificos: `/api/v2/metadata/schema`, `/api/v2/metadata/instance/<PK | UUID>` e outros `/api/v2/metadata/<...>`.
-- A busca por schema OpenAPI retornou a pagina `API v2 - Schema` em `docs.geonode.org/en/4.4.0/devel/api/V2/index.html`, o que indica que a referencia de schema formal ainda esta publicada em uma trilha 4.4.0, embora a documentacao 5.0.x aponte para a mesma familia de API v2.
-- A pagina oficial `API usage examples` em `5.0.x` documenta operacoes concretas como `POST /api/v2/uploads/upload`, `POST /api/v2/documents`, `PATCH /api/v2/users/{pk}` e operacoes de grupos/permissoes.
-- Os exemplos oficiais da API v2 usam header `Authorization: Basic ...`, indicando que Basic Auth e um caminho viavel em muitas instalacoes para um MCP servidor-servidor.
-- A documentacao de arquitetura descreve OAuth2 com Django OAuth Toolkit e escopos `read`, `write` e `groups`, entao um MCP tambem pode suportar OAuth2/Bearer quando a instancia exigir.
-- A referencia OpenAPI declara `GET /api/v2/schema/` com resposta OpenAPI 3 em YAML ou JSON, o que abre caminho para descoberta automatizada de capacidades.
-- A API v2 exposta na referencia usa padroes previsiveis de listagem e filtragem, como `page`, `page_size`, `ordering` e `search`.
-- Diagnostico preliminar: a API do GeoNode 5 e suficiente para sustentar um servidor MCP util para consulta, busca, inspecao de schema, leitura/escrita de metadados e operacoes selecionadas de upload/gestao.
+## Proximo Gargalo
+- O gargalo remanescente esta concentrado nas perguntas que ainda precisam de LLM.
+- Nessas perguntas, o custo dominante continua sendo `generate_sql::google/gemini-3-flash-preview`.
+- O proximo ataque correto nao e mais cache de infraestrutura; e roteamento de modelo com fallback estrito.
 
-## Technical Decisions
+## Requisitos do Proximo Ciclo
+- Nunca aceitar SQL do modelo rapido sem validacao forte.
+- Manter fallback obrigatorio para o modelo principal quando:
+  - `QueryContract` divergir
+  - a relevancia cair
+  - o `SemanticCritic` apontar issues
+  - o guard bloquear
+  - a SQL parecer estruturalmente instavel para a pergunta
+
+## Estratégia Recomendada
+1. Construir uma suite de aceitacao com perguntas validadas do projeto.
+2. Separar perguntas por classe:
+   - `deterministic_skip`
+   - `llm_required_simple`
+   - `llm_required_complex`
+3. Testar um modelo rapido apenas em `llm_required_simple`.
+4. Validar automaticamente antes de aceitar:
+   - `normalize_sql_candidate`
+   - `sql_matches_query_contract`
+   - `is_sql_relevant_to_question`
+   - `SemanticCritic.assess`
+   - `guard.validate`
+5. Se qualquer gate falhar, chamar o modelo principal e descartar a tentativa rapida.
+
+## Decisões
 | Decision | Rationale |
 |----------|-----------|
-| Produzir relatorio final tambem em arquivo Markdown local | Facilita revisao e reutilizacao posterior |
-| Propor `resources` MCP para schemas e `tools` MCP para operacoes REST | Fica alinhado com a natureza consultiva versus transacional da API do GeoNode |
+| Nao usar corte agressivo de prompt como estrategia principal | Reduziu tokens, mas nao trouxe ganho consistente e aumentou risco semantico |
+| Continuar com `abstention-first` | A latencia so vale quando preserva qualidade |
+| Tratar benchmark direto da uva como prova de que o skip deterministico resolveu o gargalo para perguntas simples | O `llm_ms` foi a zero no caso real |
 
-## Issues Encountered
-| Issue | Resolution |
-|-------|------------|
-| Nenhum ate o momento | N/A |
-
-## Resources
-- Skill `planning-with-files`: /Users/davi/.codex/skills/planning-with-files/SKILL.md
-- Skill `valyu-best-practices`: /Users/davi/.agents/skills/valyu-best-practices/SKILL.md
-- GeoNode API 5.0.x: https://docs.geonode.org/en/5.0.x/devel/
-- GeoNode OAuth2/security docs: https://docs.geonode.org/en/5.0.0/advanced/components/
-- GeoNode 5 metadata intro: https://docs.geonode.org/en/master/devel/metadata/intro.html
-- GeoNode metadata design: https://docs.geonode.org/en/master/devel/metadata/design.html
-- API v2 schema reference: https://docs.geonode.org/en/4.4.0/devel/api/V2/index.html
-- MCP tools concept: https://modelcontextprotocol.io/docs/concepts/tools
-- MCP Python SDK docs: https://py.sdk.modelcontextprotocol.io/
-
-## Visual/Browser Findings
-- A pagina `GeoNode API` em 5.0.x funciona como indice de capacidades da API, nao como schema formal completo.
-- As paginas de metadata em `master` deixam explicito que a novidade de 5.x esta no modelo dinamico de metadados e em endpoints REST/JSON Schema adicionais.
-- A referencia OpenAPI documenta explicitamente `GET /api/v2/schema/`, reforcando a possibilidade de descoberta dinamica num servidor MCP.
+## Recursos
+- Relatorio tecnico principal: `/Users/davi/development/geo-ia-db-master/api-geo-nlp/docs/relatorio-otimizacao-memory-adaptation-2026-03-15.md`
+- Runtime orchestrator: `/Users/davi/development/geo-ia-db-master/api-geo-nlp/app/modules/runtime/orchestrator.py`
+- Vanna agent: `/Users/davi/development/geo-ia-db-master/api-geo-nlp/app/integrations/vanna/agent.py`

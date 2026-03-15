@@ -2,69 +2,42 @@
 
 ## Session: 2026-03-15
 
-### Phase 1: Requirements & Discovery
-- **Status:** complete
-- **Started:** 2026-03-15 10:23:55 -03
-- Actions taken:
-  - Li as instrucoes dos skills `planning-with-files` e `valyu-best-practices`.
-  - Inicializei arquivos de memoria de trabalho do projeto para conduzir a pesquisa.
-- Files created/modified:
-  - task_plan.md (created)
-  - findings.md (created)
-  - progress.md (created)
+### Status
+- Nenhuma pendencia local sem commit no repo raiz.
+- Nenhuma pendencia local sem commit em `api-geo-nlp`.
+- Ultima rodada entregue e publicada:
+  - `api-geo-nlp`: `5b6136c`
+  - repo raiz: `bf2b626`
 
-### Phase 2: Research & Source Validation
-- **Status:** complete
-- Actions taken:
-  - Pesquisei a documentacao oficial do GeoNode 5 e os materiais da API v2.
-  - Levantei autenticacao, endpoints de metadados, exemplos de uso e referencia de schema.
-- Files created/modified:
-  - findings.md (updated)
-  - task_plan.md (updated)
+### Entregas Concluidas
+- Cache do evidence pack por versao ativa.
+- Cache de custo SQL por SQL normalizada.
+- Reuso da estimativa do candidato vencedor em `R4`.
+- Cache TTL de credenciais por `secret_ref`.
+- Cache TTL de metadata de grounding por projeto.
+- Skip do `generate_sql` para candidato deterministico forte em `tier_1/tier_2`.
 
-### Phase 3: MCP Feasibility Assessment
-- **Status:** complete
-- Actions taken:
-  - Modelei um desenho de MCP com `resources` para schema e `tools` para operacoes REST.
-  - Avaliei autenticacao, seguranca, paginacao, escrita e riscos de compatibilidade.
-- Files created/modified:
-  - findings.md (updated)
-  - task_plan.md (updated)
+### Benchmark Consolidado
+- Caso: `qual o estado com maior producao de uva`
+- Resultado atual:
+  - `avg backend ms`: `1345.41`
+  - `avg llm ms`: `0.00`
+  - `p50 end-to-end ms`: `1074.49`
+  - `warm backend ms`: `860.18-908.43`
 
-### Phase 4: Report Drafting
-- **Status:** complete
-- Actions taken:
-  - Estruturei o relatorio tecnico consolidando pesquisa e proposta de implementacao.
-  - Gravei o relatorio final em `geonode5-mcp-diagnostico.md`.
-- Files created/modified:
-  - task_plan.md (updated)
-  - geonode5-mcp-diagnostico.md (created)
-
-### Phase 5: Delivery
-- **Status:** complete
-- Actions taken:
-  - Revisei o relatorio final para consistencia tecnica e referencias.
-  - Preparei a resposta final com links e localizacao do artefato.
-- Files created/modified:
-  - task_plan.md (updated)
-  - progress.md (updated)
+### Proximo Trabalho
+- Construir suite de aceitacao para `llm_required`.
+- Testar roteamento de modelo rapido com fallback estrito.
+- Medir latencia e qualidade antes/depois por classe de pergunta.
 
 ## Test Results
-| Test | Input | Expected | Actual | Status |
-|------|-------|----------|--------|--------|
-| Session catchup | script session-catchup.py | Relatorio ou saida neutra | Sem contexto previo relevante retornado | pass |
-| Source validation | docs.geonode.org + modelcontextprotocol.io | Fontes oficiais suficientes | Fontes oficiais confirmadas para diagnostico | pass |
+| Test | Status | Notes |
+|------|--------|-------|
+| `pytest ... test_runtime_contextual_candidate.py ...` | pass | `59 passed` |
+| Benchmark direto `qual o estado com maior producao de uva` | pass | `llm_ms = 0.00` com skip deterministico |
 
 ## Error Log
-| Timestamp | Error | Attempt | Resolution |
-|-----------|-------|---------|------------|
-|           |       | 1       |            |
-
-## 5-Question Reboot Check
-| Question | Answer |
-|----------|--------|
-| Where am I? | Phase 5, entrega concluida |
-| Where am I going? | Encerrar com resumo e eventuais proximos passos |
-| What's the goal? | Diagnosticar a API do GeoNode 5 e propor um MCP viavel |
-| What have I learned? | A API v2 e o metadata engine de 5.x tornam o MCP viavel |
-| What have I done? | Pesquisei fontes oficiais, validei a abordagem, gerei e revisei o relatorio final |
+| Timestamp | Error | Resolution |
+|-----------|-------|------------|
+| 2026-03-15 | Cache de engine assíncrona preso ao event loop do benchmark | Cache corrigido por `event loop` |
+| 2026-03-15 | Experimento de corte agressivo de prompt sem ganho consistente | Revertido |
