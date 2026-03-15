@@ -15,6 +15,15 @@
 - Nessas perguntas, o custo dominante continua sendo `generate_sql::google/gemini-3-flash-preview`.
 - O proximo ataque correto nao e mais cache de infraestrutura; e roteamento de modelo com fallback estrito.
 
+## Descoberta Nova
+- Parte do bucket `llm_required_simple` nao precisava de modelo rapido.
+- Havia perguntas comparativas simples que estavam caindo no LLM por falha de extração de `entity_groups`.
+- Depois de normalizar prefixos metricos como `valor de producao de`, o `semantic_template_reuse` passou a cobrir perguntas como:
+  - `Compare o valor de producao de Aquicultura e Pecuaria por estado`
+- Benchmark aceito para esse caso:
+  - `avg backend ms`: `1430.24`
+  - `avg llm ms`: `0.00`
+
 ## Requisitos do Proximo Ciclo
 - Nunca aceitar SQL do modelo rapido sem validacao forte.
 - Manter fallback obrigatorio para o modelo principal quando:

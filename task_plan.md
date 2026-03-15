@@ -4,19 +4,19 @@
 Atacar o proximo gargalo do runtime depois da eliminacao do `memory_adaptation_generator`, do cache quente do Vanna, do cache do evidence pack, do cache de custo SQL e do skip do LLM para candidatos deterministicos fortes.
 
 ## Current Phase
-Phase 1
+Phase 2
 
 ## Phases
 ### Phase 1: Baseline do novo hot path
-- [ ] Consolidar benchmark atual do caminho com LLM
-- [ ] Separar cenarios `deterministic_skip` vs `llm_required`
-- [ ] Confirmar quais perguntas ainda dependem do `generate_sql`
-- **Status:** pending
+- [x] Consolidar benchmark atual do caminho com LLM
+- [x] Separar cenarios `deterministic_skip` vs `llm_required`
+- [x] Confirmar quais perguntas ainda dependem do `generate_sql`
+- **Status:** complete
 
 ### Phase 2: Suite de aceitacao para roteamento de modelo
 - [ ] Extrair conjunto de perguntas validadas de `qa/feedback`
-- [ ] Classificar casos simples, medianos e complexos
-- [ ] Definir criterios automáticos de aceitacao/rejeicao do SQL rapido
+- [x] Classificar casos simples, medianos e complexos
+- [x] Definir criterios automáticos de aceitacao/rejeicao do SQL rapido
 - **Status:** pending
 
 ### Phase 3: Roteamento de modelo com fallback estrito
@@ -42,6 +42,7 @@ Phase 1
 | Nao trocar o modelo principal sem suite de aceitacao | Ganho de latencia sem garantia de SQL correta nao serve para producao |
 | Priorizar eliminação de chamadas LLM desnecessarias antes de roteamento de modelo | Segue a linha de pruning/verification observada em BIRD/Spider |
 | Tratar `deterministic_skip` como caminho preferencial para perguntas simples | Remove o maior custo com risco menor do que trocar modelo |
+| Corrigir misses de `semantic_template_reuse` antes de introduzir modelo rapido | Reaproveitamento validado e mais seguro do que nova inferencia |
 
 ## Errors Encountered
 | Error | Attempt | Resolution |
@@ -52,3 +53,4 @@ Phase 1
 ## Notes
 - O proximo ciclo deve focar apenas no caminho que ainda exige LLM.
 - O critério de aceite continua sendo `abstention-first`: se houver dúvida, usar o modelo principal.
+- Descoberta desta rodada: parte relevante do `llm_required_simple` era falso positivo causado por extração imperfeita de `entity_groups`.

@@ -16,6 +16,7 @@
 - Cache TTL de credenciais por `secret_ref`.
 - Cache TTL de metadata de grounding por projeto.
 - Skip do `generate_sql` para candidato deterministico forte em `tier_1/tier_2`.
+- Normalizacao de `entity_groups` para ampliar o `semantic_template_reuse` em perguntas comparativas simples.
 
 ### Benchmark Consolidado
 - Caso: `qual o estado com maior producao de uva`
@@ -26,8 +27,8 @@
   - `warm backend ms`: `860.18-908.43`
 
 ### Proximo Trabalho
-- Construir suite de aceitacao para `llm_required`.
-- Testar roteamento de modelo rapido com fallback estrito.
+- Extrair suite de aceitacao para os casos que continuam em `llm_required`.
+- Testar roteamento de modelo rapido apenas nesse subconjunto remanescente.
 - Medir latencia e qualidade antes/depois por classe de pergunta.
 
 ## Test Results
@@ -35,6 +36,7 @@
 |------|--------|-------|
 | `pytest ... test_runtime_contextual_candidate.py ...` | pass | `59 passed` |
 | Benchmark direto `qual o estado com maior producao de uva` | pass | `llm_ms = 0.00` com skip deterministico |
+| Benchmark direto `Compare o valor de producao de Aquicultura e Pecuaria por estado` | pass | `avg backend ms = 1430.24`, `llm_ms = 0.00` |
 
 ## Error Log
 | Timestamp | Error | Resolution |
