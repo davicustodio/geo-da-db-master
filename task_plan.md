@@ -10,6 +10,12 @@ O entregável inclui backend, frontend e testes atualizados.
 ## Goal (2026-03-11 - Apresentação)
 Analisar a arquitetura atual do projeto, com foco na API `api-geo-nlp` e no pipeline baseado em Vanna AI, para montar um plano de apresentação de 15 minutos em linguagem acessível para público leigo.
 
+## Goal (2026-03-14 - Diagnóstico completo BIRD)
+Ler os diagnósticos locais inspirados no benchmark BIRD, pesquisar o conteúdo disponível no ecossistema oficial do BIRD e cruzar tudo isso com o pipeline real do projeto (`api-geo-nlp` + `ai-data-pilot-manager`) para propor um novo pipeline com maior acurácia e menor latência. O entregável é `api-geo-nlp/docs/diagnostico-completo.md`.
+
+## Goal (2026-03-14 - Implementação BIRD)
+Usar `api-geo-nlp/docs/diagnostico-completo.md` como guia de implementação para evoluir `geo-ia-db-master`, `api-geo-nlp` e `ai-data-pilot-manager` sem tocar `maps-api`, garantindo branches dedicados, acesso ao PostgreSQL, execução incremental por fases, bateria de testes/validações e checklist final do que foi entregue.
+
 ## Phases
 - [x] Mapear o fluxo atual de setup, treinamento, curadoria e lab.
 - [x] Definir o modelo-alvo em `api-geo-nlp/docs/plano-ui-pipeline-duas-etapas.md`.
@@ -20,6 +26,24 @@ Analisar a arquitetura atual do projeto, com foco na API `api-geo-nlp` e no pipe
 - [x] Consolidar a mensagem principal para público leigo.
 - [x] Definir sequência de slides, tempo por slide e mensagem-chave para apresentação de 15 minutos.
 
+## Phases (2026-03-14 - Diagnóstico completo BIRD)
+- [x] Ler os documentos locais `bird-gemini.md`, `bird-gpt.md`, `bird-qwen.md` e o material anterior de diagnóstico.
+- [x] Mapear o pipeline atual da API: discovery, corpus, quality gate, embeddings, runtime e ranking.
+- [x] Mapear o estado atual da UI: setup, metadata, questions e lab.
+- [ ] Levantar no ecossistema oficial do BIRD as métricas, tracks, leaderboard e extensões relevantes (BIRD-SQL, R-VES, LiveSQLBench, BIRD-Interact).
+- [ ] Consolidar as recomendações prioritárias com foco em acurácia, latência e governança operacional.
+- [ ] Escrever `api-geo-nlp/docs/diagnostico-completo.md`.
+
+## Phases (2026-03-14 - Implementação BIRD)
+- [x] Criar e fazer checkout do branch `codex/bird-implementation` em `geo-ia-db-master`, `api-geo-nlp` e `ai-data-pilot-manager`.
+- [x] Validar acesso ao PostgreSQL configurado pela API.
+- [x] Mapear lacunas entre o diagnóstico e a implementação atual do backend/UI.
+- [x] Implementar os artefatos e contratos centrais da nova camada semântica.
+- [x] Implementar o runtime adaptativo com evidence pack, roteamento por tier e critic/repair inicial.
+- [x] Adaptar a UI para refletir novos artefatos, sinais de runtime e estados de validação.
+- [x] Executar bateria de testes, benchmark e correções até estabilizar.
+- [x] Consolidar checklist final de implementação e validação.
+
 ## Decisions
 - Usar o skill `planning-with-files` porque a tarefa é de organização e definição estratégica.
 - Implementar a separação explícita entre `base semântica` e `embeddings do Vanna`.
@@ -29,6 +53,9 @@ Analisar a arquitetura atual do projeto, com foco na API `api-geo-nlp` e no pipe
 
 ## Errors Encountered
 - `eslint` não está disponível no ambiente atual (`npm run lint` falha com `eslint: command not found`).
+- O primeiro teste de conexão com o PostgreSQL falhou por diretório de trabalho incorreto; corrigido em seguida com conexão validada via `psql`.
+- O smoke test real do runtime para o projeto `datahub2` encontrou incompatibilidade de ambiente/dados: a base ativa do projeto não possui a relação `public.producao`, o que impede validar esse cenário específico via `EXPLAIN/execução` sem corrigir a conexão/schema do projeto.
+- Em `2026-03-15`, a causa raiz do item anterior foi resolvida: a conexão ativa do `datahub2` estava com `password_encrypted` incompatível com a chave atual, o runtime caía em fallback para `ai-data-pilot`, e por isso consultava a base errada. A credencial foi regravada, a resolução voltou para `datahub` e a validação real foi retomada com sucesso.
 
 ## Follow-up: diagnóstico da falha em embeddings
 - [x] Reproduzir a falha do botão `Gerar embeddings` com usuário real na UI local.
@@ -129,3 +156,9 @@ Analisar a arquitetura atual do projeto, com foco na API `api-geo-nlp` e no pipe
 - Tratar como desvio crítico o fato de a memória similar ser usada como SQL candidata direta antes da geração do prompt, porque isso contorna a adaptação contextual que a documentação do Vanna 2.0 descreve.
 - Corrigir a compatibilidade de `get_similar_question_sql()` com o contrato esperado pelo prompt do Vanna legado (`dict` com `question` e `sql`), ou abandonar essa via e migrar explicitamente para o fluxo oficial do Agent/Tool Memory do Vanna 2.0.
 - Para perguntas geo-analiticas simples e recorrentes, priorizar compilacao deterministica por contrato antes de Tool Memory, PgVector e `vanna.generate_sql`.
+
+## Decisions (2026-03-14 - Diagnóstico completo BIRD)
+- Usar o skill `planning-with-files` porque a tarefa envolve pesquisa multi-fonte, comparação arquitetural e produção de um relatório estruturado.
+- Tratar os três documentos `bird-*` como insumos de hipótese, e o site oficial do BIRD + papers oficiais como fonte de validação externa.
+- Analisar o pipeline atual no código, não apenas nos documentos, para evitar propor mudanças incompatíveis com a arquitetura já implementada.
+- Procurar um desenho de pipeline em camadas: fast path barato/determinístico para perguntas simples, e pipeline multiestágio mais caro apenas para casos difíceis.

@@ -218,6 +218,51 @@
 - Cobertura adicional criada:
   - teste unitário garantindo que `memory_adaptation_fast_path` execute antes de `get_vanna_for_project()` quando houver pergunta semelhante;
   - `python3 -m py_compile` passou;
+
+## Session Log (2026-03-14 - Diagnóstico completo BIRD)
+- Foram lidos os documentos locais:
+  - `api-geo-nlp/docs/bird-gemini.md`
+  - `api-geo-nlp/docs/bird-gpt.md`
+  - `api-geo-nlp/docs/bird-qwen.md`
+  - `api-geo-nlp/docs/plano-ui-pipeline-duas-etapas.md`
+  - `api-geo-nlp/docs/relatorio_bird_spider_diagnostico_otimizacao.md`
+- Foi mapeado o pipeline real da API nos arquivos:
+  - `api-geo-nlp/app/modules/training/orchestrator.py`
+  - `api-geo-nlp/app/modules/training/services/metadata_discovery.py`
+  - `api-geo-nlp/app/modules/training/services/corpus_builder.py`
+  - `api-geo-nlp/app/modules/training/phases/t4_quality.py`
+  - `api-geo-nlp/app/integrations/vanna/agent.py`
+  - `api-geo-nlp/app/modules/runtime/orchestrator.py`
+  - `api-geo-nlp/app/modules/runtime/candidate_pipeline.py`
+- Foi mapeada a UI atual nos arquivos:
+  - `ai-data-pilot-manager/src/pages/ProjectSetupPage.tsx`
+  - `ai-data-pilot-manager/src/pages/MetadataPage.tsx`
+  - `ai-data-pilot-manager/src/pages/QuestionsPage.tsx`
+  - `ai-data-pilot-manager/src/pages/LabPage.tsx`
+- Foi iniciada a coleta externa no ecossistema oficial do BIRD:
+  - homepage/leaderboard do BIRD;
+  - Single-Model Leaderboard;
+  - track de R-VES;
+  - sites oficiais do `LiveSQLBench` e `BIRD-Interact`.
+- Próximo passo em andamento:
+  - consolidar os achados externos mais relevantes e redigir `api-geo-nlp/docs/diagnostico-completo.md`.
+- O relatório consolidado foi criado em `api-geo-nlp/docs/diagnostico-completo.md`.
+- O documento final propõe:
+  - fortalecimento da camada semântica via catálogo, value hints, join graph e query-log mining;
+  - troca do runtime quase single-shot por runtime adaptativo em tiers;
+  - critic semântico e repair loop;
+  - retrieval real com `pgvector`;
+  - governança estrita de memória validada;
+  - adaptação da UI para expor cobertura, confiança, falhas semânticas e benchmark.
+- O relatório foi readequado com requisitos adicionais:
+  - inclusão explícita de semântica geoespacial/PostGIS na camada semântica;
+  - planner geográfico determinístico considerando SRID, projeção, `geometry` vs `geography` e custo;
+  - uso recomendado do Vanna 2.0 nas fases offline e online em que ele agrega valor;
+  - seção de latência reforçada com estratégias específicas para perguntas geográficas;
+  - sincronismo obrigatório entre backend e UI na evolução do pipeline.
+- O relatório também passou a explicitar como restrição obrigatória:
+  - manter a arquitetura atual de persistência no banco de dados, segregada por usuário e por projeto;
+  - preservar a UI atual como superfície principal de gestão do pipeline/Lab, adaptando-a às novas fases sem quebrar o modelo de armazenamento existente.
 - Em `2026-03-12`, foi aberto o diagnóstico específico da pergunta `qual o bioma que mais produz milho`.
 - A reprodução HTTP no servidor já aquecido mostrou resposta rápida (`~0.8s`) porque o runtime estava usando `R2.candidate_cache_hit`; esse resultado mascarava o cold path real.
 - A medição fria em processo novo mostrou o comportamento real antes do ajuste estrutural:
@@ -256,3 +301,52 @@
   - pergunta `me mostre os produtos da categoria pecuaria que cresceram no valor de producao entre 2018 e 2019` retornou `selected_source = memory_adaptation_fast_path`;
   - nesse primeiro hit frio, `total_backend_ms = 6769.67` e houve uma única chamada `generate_sql_memory_fast_path`;
   - em execuções subsequentes da mesma pergunta, o cache por versão assumiu o controle e o backend caiu para `~508ms`, sem nenhuma chamada LLM.
+- `2026-03-14 23:xx` Início da implementação guiada por `api-geo-nlp/docs/diagnostico-completo.md`.
+- Branches criados/selecionados:
+  - `geo-ia-db-master`: `codex/bird-implementation`
+  - `api-geo-nlp`: `codex/bird-implementation`
+  - `ai-data-pilot-manager`: `codex/bird-implementation`
+- Conectividade com PostgreSQL confirmada pela API (`ai-data-pilot`, usuário `davicustodio`, PostgreSQL 16.13).
+- Próximo passo registrado: medir o gap entre diagnóstico e implementação real para priorizar backend e UI.
+- O gap foi fechado com implementação nas duas frentes principais do diagnóstico:
+  - backend com artefatos semânticos persistidos, enrich de questions e runtime adaptativo;
+  - frontend com visibilidade de cobertura semântica, confiança, critic e planner geográfico.
+- Principais entregas de backend:
+  - nova tabela `project_semantic_artifacts` e serviços de store/leitura;
+  - builder de `join_graph`, `semantic_catalog`, `value_hints`, `postgis_semantics`, `latency_budget`, `difficulty_routing_rules` e `geo_latency_rules`;
+  - expansão de `TrainingStateResponse` e do schema overview para expor artefatos semânticos;
+  - novo módulo `semantic_runtime.py` com `EvidencePackBuilder`, `DifficultyRouter`, `GeoSemanticPlanner`, `SemanticCritic`, candidatos contextuais e score de confiança;
+  - integração desses sinais ao `RuntimeOrchestrator` com repair loop inicial.
+- Principais entregas de frontend:
+  - `ProjectSetupPage` com cobertura semântica, artefatos prontos e benchmark da última execução;
+  - `MetadataPage` com papel semântico, aliases, amostras e atributos PostGIS;
+  - `QuestionsPage` com dificuldade, status de validação, checks e proveniência;
+  - `LabPage` com tier, confidence, semantic validation, geo planner e diagnóstico ampliado.
+- Correções detectadas no ciclo final:
+  - import faltante de `PgVectorStore` corrigido no runtime orchestrator após smoke real;
+  - teste `app-shell.test.tsx` atualizado para o branding atual do shell.
+- Validação consolidada:
+  - backend full suite `pytest -q`: `156 passed`;
+  - backend focal: `18 passed`;
+  - integração backend focal: `10 passed`;
+  - frontend full suite `npm test`: `42 passed`;
+  - frontend focal: `16 passed`;
+  - `npm run build`: sucesso.
+- Bloqueio remanescente isolado no ambiente:
+  - o smoke real com `scripts/benchmark_ask_runtime.py --mode direct --project-id datahub2` avançou até o runtime, mas falhou porque a conexão/base ativa do projeto não possui a relação `public.producao`.
+- Em `2026-03-15`, o bloqueio de ambiente do `datahub2` foi resolvido.
+- Diagnóstico:
+  - a conexão ativa do projeto apontava para `buriti.cnpm.embrapa.br / datahub`, mas a descriptografia de `password_encrypted` falhava;
+  - com isso, `SecretResolver` fazia fallback para o `.env` e o runtime consultava `ai-data-pilot`, onde `public.producao` não existe.
+- Ação aplicada:
+  - regravação da senha criptografada da conexão ativa em `project_db_connections` com a chave atual da aplicação.
+- Confirmações após ajuste:
+  - `ResolvedCredential(... dbname=datahub ...)` voltou a ser retornado para o `datahub2`;
+  - `public.producao` existe no banco correto com `148158` linhas;
+  - `public.municipio` também existe e segue acessível.
+- Revalidação operacional:
+  - benchmark direto no `datahub2` para `quais as 10 cidades que mais produzem soja` concluiu com `failed_count=0`;
+  - validação funcional adicional no runtime retornou `selected_source = vanna_generate_sql`, `row_count = 10` e municípios como `SORRISO`, `NOVA MUTUM` e `FORMOSA DO RIO PRETO`.
+- Conclusão atual:
+  - o item antes classificado como limitação de ambiente foi eliminado;
+  - a implementação e a validação real do `datahub2` ficaram operacionais no banco correto, sem necessidade de semear dados sintéticos.

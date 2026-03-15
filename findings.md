@@ -219,6 +219,36 @@
 
 ## Conclusão revisada
 
+## Diagnóstico completo BIRD (2026-03-14)
+- Os três documentos locais convergem em alguns pontos válidos:
+  - pipeline forte de NL2SQL não é single-shot;
+  - metadados, domínios e evidências de valor são determinantes;
+  - geração, verificação, reparo e seleção precisam ser etapas separadas;
+  - eficiência/latência deve ser tratada explicitamente, não como efeito colateral.
+- Há divergência entre os documentos quanto à ênfase:
+  - `bird-gemini.md` puxa para arquitetura ampla, rica em metadados e multiagente;
+  - `bird-gpt.md` enfatiza pipeline implementável e modular com forte grounding + verificação;
+  - `bird-qwen.md` enfatiza LLMs de ponta, loop guiado por execução, RAG/schema pruning e validação semântica mais rigorosa.
+- O pipeline atual do projeto já cobre partes importantes do preparo semântico:
+  - `MetadataDiscoveryService` extrai tabelas, colunas, PK/FK, índices, amostras de linhas, domínios e perfil espacial;
+  - `CorpusBuilder` produz `ddl.md`, `dictionary.md` e `questions.json`;
+  - `TrainingOrchestrator` separa explicitamente base semântica (`T0-T2`) de embeddings/publicação (`T3-T5`);
+  - `DatasetQualityGate` valida sintaxe, runtime, cobertura e duplicidade.
+- O runtime atual ainda está aquém do padrão BIRD topo de leaderboard:
+  - há fast paths heurísticos úteis para latência, mas pouca diversidade estruturada de candidatos;
+  - o ranking (`candidate_pipeline.py`) usa score heurístico simples e só estima custo nos primeiros candidatos;
+  - existe reparo de SQL, mas não há loop de repair multi-round orientado por taxonomia de erros;
+  - o gate de qualidade ainda não valida aderência semântica forte pergunta→SQL/resultado.
+- A UI atual já está razoavelmente alinhada à separação de fases:
+  - `ProjectSetupPage` explicita conexão, base semântica, revisão e embeddings;
+  - `MetadataPage` e `QuestionsPage` atuam como curadoria;
+  - `LabPage` já separa modalidades e sanitiza geometria para reduzir custo de resposta.
+- O principal gap para aderência ao BIRD não é “falta de uma tela nova”, mas:
+  - enriquecer melhor a camada semântica inicial;
+  - selecionar dinamicamente o nível de esforço inferencial;
+  - aumentar a capacidade de verificação semântica e seleção final;
+  - medir continuamente acurácia/latência com um harness benchmark-like.
+
 ## Diagnóstico atualizado da pergunta `qual o bioma que mais produz milho` (2026-03-12)
 - O caminho frio real do runtime para essa pergunta confirmou o gargalo no LLM, não no banco.
 - Antes do ajuste atual, o runtime fazia duas chamadas sequenciais a `vanna.generate_sql`:
@@ -617,3 +647,83 @@
 - Conclusão prática:
   - cold path caiu de ~`15.3s` para ~`6.8s`;
   - warm path repetido caiu para ~`0.5s` sem nova chamada LLM.
+- Em `2026-03-14`, foi iniciado o ciclo de implementação do plano BIRD descrito em `api-geo-nlp/docs/diagnostico-completo.md`.
+- Pré-condições executadas antes do plano:
+  - branch `codex/bird-implementation` criado e selecionado em `geo-ia-db-master`;
+  - branch `codex/bird-implementation` criado e selecionado em `api-geo-nlp`;
+  - branch `codex/bird-implementation` criado e selecionado em `ai-data-pilot-manager`;
+  - `maps-api` explicitamente fora do escopo de alteração.
+- Acesso ao PostgreSQL da API validado com `psql`:
+  - database: `ai-data-pilot`
+  - user: `davicustodio`
+  - version: `PostgreSQL 16.13`
+- O diagnóstico já descreve um backlog bastante concreto em cinco frentes:
+  - camada semântica offline (`join_graph`, `semantic_catalog`, `value_hints`, `postgis_semantics`);
+  - corpus/evidence pack e retrieval tipado;
+  - runtime adaptativo por tier;
+  - critic/repair e quality gate semântico;
+  - adaptação de UI para setup, metadata, questions e lab.
+
+## Implementação BIRD concluída (2026-03-14)
+- Backend:
+  - nova persistência de artefatos semânticos em `project_semantic_artifacts`;
+  - builders para `join_graph`, `semantic_catalog`, `value_hints`, `postgis_semantics`, `latency_budget`, `difficulty_routing_rules` e `geo_latency_rules`;
+  - enrich dos metadados automáticos de questions com dificuldade, entidades, métricas, filtros, checks e proveniência;
+  - estado de treinamento e schema overview expostos com cobertura/itens de artefatos semânticos;
+  - runtime com `evidence_pack`, roteamento por tier, planner geográfico, critic semântico, score/confiança e repair loop inicial.
+- Frontend:
+  - setup com indicadores de cobertura semântica e artefatos disponíveis;
+  - metadata exibindo papel semântico, aliases, amostras, confiança e sinais geoespaciais por coluna;
+  - questions exibindo cenário esperado, dificuldade, status de validação e proveniência;
+  - lab exibindo tier, confiança, validação semântica, planner geográfico e diagnóstico expandido.
+- Correção capturada durante o ciclo:
+  - a suíte/smoke identificou `NameError: PgVectorStore is not defined` no runtime;
+  - o import faltante foi corrigido em `app/modules/runtime/orchestrator.py`.
+
+## Validação final (2026-03-14)
+- Backend completo:
+  - `pytest -q`
+  - resultado: `156 passed`.
+- Backend focal:
+  - `pytest tests/unit/test_quality_gate.py tests/unit/test_training_state.py tests/unit/test_semantic_artifacts.py tests/unit/test_semantic_runtime.py -q`
+  - resultado: `18 passed`.
+- Integração backend focal:
+  - `pytest tests/integration/test_metadata_questions_routes.py tests/integration/test_runtime_routes.py tests/integration/test_training_routes.py -q`
+  - resultado: `10 passed`.
+- Frontend completo:
+  - `npm test`
+  - resultado: `18 files passed`, `42 tests passed`.
+- Frontend focal:
+  - `npm test -- --run src/__tests__/metadata-page.test.tsx src/__tests__/questions-page.test.tsx src/__tests__/lab-page.test.tsx src/__tests__/project-setup-page.test.tsx`
+  - resultado: `16 passed`.
+- Build frontend:
+  - `npm run build`
+  - resultado: sucesso.
+- Smoke real em projeto:
+  - `scripts/benchmark_ask_runtime.py --mode direct --project-id datahub2 ...`
+  - o código evoluído executou até o runtime real, mas a validação ficou bloqueada por inconsistência do projeto ativo: a base conectada ao `datahub2` não contém `public.producao`.
+
+## Adequação de banco e revalidação do `datahub2` (2026-03-15)
+- A causa raiz da falha de ambiente não era ausência de dados no banco `datahub`, e sim resolução incorreta da credencial ativa do projeto:
+  - a conexão ativa `conn-e8a532ec-4073-4bc4-b6b1-4ab313a8a56c` apontava corretamente para `buriti.cnpm.embrapa.br / datahub`;
+  - porém `SecretResolver.resolve(...)` não conseguia usar `password_encrypted` e caía no fallback do `.env`, abrindo `ai-data-pilot`.
+- A senha atual da API foi validada com sucesso no banco correto:
+  - `current_database() = datahub`
+  - `to_regclass('public.producao') = producao`
+  - `to_regclass('public.municipio') = municipio`
+  - `SELECT COUNT(*) FROM public.producao` retornou `148158`.
+- Como a base real já estava populada e íntegra, não foi necessário inserir dados sintéticos para o teste.
+- A correção aplicada foi operacional:
+  - regravação de `project_db_connections.password_encrypted` da conexão ativa do `datahub2` com a chave atual da aplicação;
+  - nova resolução de credencial passou a retornar `ResolvedCredential(... dbname=datahub ...)`.
+- Revalidação concluída:
+  - `scripts/benchmark_ask_runtime.py --mode direct --project-id datahub2 --question "quais as 10 cidades que mais produzem soja" ...`
+  - resultado: `status=completed`, `failed_count=0`, `end_to_end_ms=8367.11`, `backend_ms=8208.0`, `llm_ms=3116.12`, `db_ms=2142.04`.
+- Validação funcional adicional no runtime:
+  - `selected_source = vanna_generate_sql`
+  - SQL final executada: `SELECT m.nm_municip, SUM(p.qtde_produzida) AS producao_soja ... LIMIT 10`
+  - `row_count = 10`
+  - primeiras linhas:
+    - `SORRISO | 2141700`
+    - `NOVA MUTUM | 1322580`
+    - `FORMOSA DO RIO PRETO | 1311900`
