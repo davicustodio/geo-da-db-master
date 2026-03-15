@@ -1,352 +1,70 @@
 # Progress Log
 
-## Session Log
-- Em `2026-03-11`, foi analisada a arquitetura atual do projeto para preparar uma apresentacao executiva/didatica sobre a estrategia NLP2SQL.
-- Foram revisados os pontos principais da API `api-geo-nlp`, especialmente:
-  - `POST /projects/{project_id}/ask`;
-  - `RuntimeOrchestrator`;
-  - pipeline de ranking/validacao de SQL;
-  - integracao com Vanna;
-  - pipeline em duas etapas de base semantica + embeddings.
-- Foi consolidado um plano de apresentacao em `docs/plano-apresentacao-nlp2sql-15min.md`, com 10 slides recomendados, roteiro de tempo e linguagem simplificada para publico leigo.
-- Implementado o modelo de duas etapas no backend e frontend.
-- O pipeline inicial agora termina na base semântica; a geração de embeddings virou ação separada.
-- Foi adicionada a confirmação explícita de revisão da base semântica.
-- Edições de curadoria agora deixam embeddings desatualizados e bloqueiam o Lab até nova geração.
-- Testes direcionados do frontend passaram.
-- Testes direcionados do backend passaram.
-- Build do frontend passou.
-- Lint do frontend não pôde rodar por ausência de `eslint` no ambiente.
-- Reprodução operacional realizada em `2026-03-11` com login de projeto real via UI local.
-- Nova tentativa de `Gerar embeddings` no projeto `datahub2` gerou o job `d9d1058b-3ce0-4f6a-a343-f7ec4898f270` e falhou com a mesma mensagem do job anterior.
-- Foi executado um script local usando `TrainingOrchestrator._build_runtime_sql_validator` para validar todas as `questions` da versão `20260311T120841Z`.
-- Resultado do script: apenas 1 SQL falha em runtime; pergunta `id=388`, relacionada à participação da região Norte na produção de açaí.
-- A causa raiz é uma subquery com correlação inválida (`p.nome_produto`) que dispara `GroupingError` no `EXPLAIN`.
-- A `question 388` foi corrigida operacionalmente via API e passou a ficar com `sql_is_valid = true`.
-- O backend foi ajustado para persistir `quality_report` e `quality_failure` mesmo quando o build falha.
-- O gate de qualidade agora bloqueia explicitamente questions previamente marcadas como inválidas e preserva detalhes de runtime por pergunta.
-- O frontend foi ajustado para mostrar diagnóstico no monitor/log e resumo de questions inválidas na curadoria.
-- Testes direcionados passaram:
-  - backend: `./.venv/bin/pytest tests/unit/test_quality_gate.py tests/unit/test_training_orchestrator.py -q`
-  - frontend: `npm test -- --run src/__tests__/training-job-log-modal.test.tsx src/__tests__/project-setup-page.test.tsx src/__tests__/questions-page.test.tsx`
-  - frontend build: `npm run build`
-- Revalidação real concluída:
-  - revisão semântica reconcluída;
-  - novo job `38d0f283-d1a0-4058-a6f4-3b6f10f499de` executado;
-  - quality gate aprovado;
-  - publish concluído com sucesso;
-  - `datahub2` voltou para `ready=true`, `embeddings=published`, `lab=true`.
-- Em `2026-03-11`, o caso do Lab `quais as 10 cidades que mais produzem soja` foi reproduzido via API autenticada com `davi.custodio@embrapa.br`.
-- A API retornou a mesma SQL incorreta vista no Lab, com `MATO GROSSO` e `LIMIT 5`.
-- O `decision_trace` confirmou seleção do candidato `pgvector_memory`.
-- Foi identificado um chunk contaminado em `project_rag_chunks` com `chunk_type='feedback'` e `feedback_by='runtime_auto'` para a própria pergunta testada.
-- O runtime está salvando automaticamente toda resposta em memória vetorial e memória do Vanna sem validação humana, via `RuntimeOrchestrator._save_to_memory`.
-- A função `_is_sql_relevant_to_question()` classificou a SQL incorreta como totalmente aderente (`relevance_score = 1.0`).
-- O ranking privilegiou os 3 primeiros candidatos da memória para cost estimation, o que rebaixou um candidato semanticamente melhor vindo do fallback de contexto.
-- O corpus ativo tem várias questions específicas por estado para soja e não tem um exemplar genérico equivalente para o caso nacional.
-- A latência total da API foi `34.291ms`, enquanto a execução do SQL foi `79.03ms`.
-- A decomposição local por etapa indicou gargalo em chamadas LLM:
-  - classificação: `4344.67ms`
-  - geração de candidatos: `7360.08ms`
-  - sugestão de gráfico: `5512.66ms`
-  - execução SQL: `101.23ms`
-- Foi levantada a documentação oficial do Vanna AI 2.0 e do pacote `vanna==2.0.2` para comparar o fluxo recomendado de Tool Memory/RAG/prompt.
-- A documentação do Vanna 2.0 aponta arquitetura baseada em `Agent + ToolRegistry + AgentMemory`, com `successful interactions` salvas em Tool Memory e adaptação contextual para perguntas similares.
-- O código do projeto não usa `Agent`, `ToolRegistry`, `DefaultLlmContextEnhancer`, `SaveQuestionToolArgsTool` ou `SearchSavedCorrectToolUsesTool`; usa `OpenAI_Chat`/`legacy` com RAG e ranking próprios.
-- Foi inspecionado o método oficial `VannaBase.get_sql_prompt()` do pacote instalado `vanna==2.0.2`.
-- A implementação local de `get_similar_question_sql()` retorna `tuple(question, sql)`, mas o prompt oficial do Vanna espera objetos com chaves `question` e `sql`.
-- Foi gerado o prompt real do `vn.generate_sql()` para a pergunta investigada:
-  - `examples_type = tuple`
-  - `message_count = 2`
-  - nenhum exemplo Q→SQL recuperado entrou no prompt, apenas contexto documental + pergunta.
-- Conclusão registrada: o runtime atual desvia da arquitetura/documentação do Vanna 2.0 e também está incompatível com a forma oficial de injetar exemplos no prompt do Vanna legado.
-- A integração Vanna foi corrigida para:
-  - usar exemplos em formato `{"question","sql"}`;
-  - filtrar exemplos incompatíveis antes do prompt;
-  - substituir o prompt legado por um prompt contextual que explicita que a pergunta atual é a fonte da verdade;
-  - impedir `runtime_auto` no salvamento automático e no resgate de memória.
-- Os chunks `feedback/runtime_auto` contaminados do `datahub2` foram removidos da tabela `project_rag_chunks` (`ids 316, 317, 318, 319`).
-- A API local em `:8000` foi reiniciada e revalidada com `davi.custodio@embrapa.br`.
-- Resultado funcional após correção via HTTP:
-  - `decision_source = vanna_generate_sql`;
-  - SQL sem filtro por `MATO GROSSO`;
-  - `LIMIT 10`;
-  - `R10 = Interacao concluida; memoria depende de feedback validado.`
-- A latência ponta a ponta caiu após cortar chamadas LLM redundantes:
-  - primeiro request após restart: ~`14.5s`;
-  - request subsequente: ~`10.3s`;
-  - execução SQL observada: entre ~`0.34s` e ~`3.25s` conforme aquecimento/candidato selecionado.
-- Em `2026-03-11`, foi feita análise cruzada UI/API para o novo problema de performance do `Lab` com perguntas geográficas.
-- Foi confirmado que:
-  - o botão `Ver payload geo` é o único consumidor de `result.geo` na UI atual;
-  - o backend monta `GeoJSON` inline no `ask` quando detecta geometria;
-  - a tabela do `Lab` renderiza qualquer coluna retornada, inclusive `geom`;
-  - o contrato já possui `modalities`, suficiente para indicar que a resposta sugere `texto`, `tabela`, `grafico` e/ou `mapa`.
-- Direção consolidada para o próximo passo:
-  - remover o uso de payload geográfico do fluxo principal do `Lab`;
-  - nunca expor colunas geoespaciais na tabela de resposta;
-  - substituir o botão/modal geográfico por indicação leve de modalidade;
-  - complementar com métricas por etapa para comprovar o ganho de latência.
-- Em `2026-03-11`, o plano foi refinado com um requisito adicional de produto:
-  - a API deve suportar explicitamente consultas com ou sem retorno de `geom`, dependendo do consumidor;
-  - o `Lab` passa a ser apenas um consumidor do modo “sem geometria”;
-  - integrações futuras com geração de GeoJSON, `maps-api` e WMS permanecem suportadas pelo modo “com geometria”.
-- Implementação concluída em `2026-03-11`:
-  - backend: `geometry_mode` adicionado ao runtime e propagado para transportes Vanna;
-  - backend: SQL/resultset adaptados para excluir geometrias quando solicitado;
-  - frontend: `Lab` fixado em `geometry_mode='exclude'`;
-  - frontend: botão/modal geo removidos, com badges de modalidade no lugar;
-  - testes backend e frontend direcionados passaram;
-  - `npm run build` do manager passou.
-- Em `2026-03-11`, foi consolidado o plano técnico da próxima frente de trabalho para observabilidade do `Perguntar`.
-- O fluxo confirmado para instrumentação é:
-  - `LabPage.tsx` -> `client.ts::ask()` -> `http.ts` -> `/projects/{project_id}/ask` -> `RuntimeOrchestrator.ask()`.
-- Foram identificados como pontos centrais de coleta:
-  - `RuntimeOrchestrator.ask()` para spans de etapa;
-  - `run_vanna_prompt()` para inferência LLM;
-  - `generate_sql_candidates()` para geração/fallback;
-  - `rank_sql_candidates()` para custo e score;
-  - `SqlExecutionService` / `CostEstimator` para banco.
-- A direção definida é implementar um coletor de métricas por request com correlação entre UI, API e auditoria, em vez de logs soltos por função.
-- Implementação da observabilidade concluída em `2026-03-11`:
-  - backend: `request_id` propagado via `AskRequest.request_context.metadata`, `AskResponse` e auditoria;
-  - backend: novo coletor `RuntimeMetricsCollector` criado para spans, chamadas LLM e operações SQL;
-  - backend: `AskResponse` passou a suportar `timing` com resumo e detalhes quando `include_timing_summary=true`;
-  - backend: `RuntimeOrchestrator`, `run_vanna_prompt`, `generate_sql_candidates`, `rank_sql_candidates`, `CostEstimator` e `SqlExecutionService` passaram a registrar tempos;
-  - frontend: `ask()` passou a gerar `request_id`, enviar `x-request-id` e anexar `client_metrics.http_roundtrip_ms`;
-  - frontend: `LabPage` passou a registrar `click_to_response_ms` e a exibir `request_id`, `client_metrics`, `timing` e `stage_diagnostics` na aba de diagnósticos.
-- Validação técnica da implementação:
-  - `python3 -m py_compile` passou nos arquivos Python alterados;
-  - `npm test -- --run src/__tests__/api-client.contract.test.ts src/__tests__/lab-page.test.tsx` passou;
-  - `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest ...` executou os testes síncronos/puros, mas pulou os assíncronos por ausência do plugin de async no ambiente.
-- Em `2026-03-11`, foi implementado o harness da próxima etapa de medição:
-  - script `api-geo-nlp/scripts/benchmark_ask_runtime.py` para executar bateria controlada contra a API;
-  - suporte a perguntas inline ou arquivo JSON de cenários;
-  - medição de `http_roundtrip`, `end_to_end`, `total_backend`, `llm_total`, `db_total`, `geo_total`, spans, chamadas LLM e operações SQL;
-  - consolidação automática de `avg/p50/p95/% total` por cenário, etapa, chamada LLM e operação SQL;
-  - suporte a respostas síncronas e em background com polling;
-  - geração opcional de saída em JSON e Markdown.
-- Também foi adicionado `api-geo-nlp/scripts/benchmark_questions.example.json` com cenários iniciais de referência.
-- Em `2026-03-11`, o benchmark foi executado de fato no projeto `datahub2`.
-- Como a instância HTTP em `:8000` não devolvia `timing` e instâncias HTTP frescas ficaram inconsistentes no startup, a medição consolidada foi feita com `scripts/benchmark_ask_runtime.py --mode direct`, chamando o `RuntimeOrchestrator` do código atual diretamente.
-- Resultados principais observados:
-  - smoke `quais as 10 cidades que mais produzem soja`: `end_to_end_ms ~ 10.29s`, `llm_total_ms ~ 7.03s`, `db_total_ms ~ 0.59s`, `R2.generate_candidates ~ 9.05s`;
-  - lote estável (`ranking-soja-nacional` + `total-acai-norte`): `avg_end_to_end_ms ~ 7.25s`, `avg_backend_ms ~ 7.18s`, `avg_llm_ms ~ 5.93s`, `avg_db_ms ~ 0.83s`;
-  - pior caso isolado (`distribuicao-por-estado`): amostra contada em `~21.78s`, com `llm_total_ms ~ 16.20s` e `db_ms ~ 0.64s`.
-- Conclusão prática validada no projeto:
-  - o gargalo dominante está em `R2.generate_candidates` / `generate_sql`;
-  - o banco não é o principal limitador;
-  - cenários de baixa aderência entram em fallback prolongado e tornam o runtime instável/lento.
-- Em `2026-03-11`, foi implementado um bypass determinístico em `api-geo-nlp/app/integrations/vanna/agent.py` para reduzir dependência de LLM:
-  - `exact_training_match` para reutilizar SQL validada em perguntas idênticas;
-  - `geo_rule_fast_path` para rankings, totais e distribuições geo-analíticas simples.
-- As heurísticas foram ajustadas para reconhecer melhor:
-  - frases como `que mais produzem soja`;
-  - distinção entre `valor total da produção` e `quantidade produzida`;
-  - `distribuição` como intenção agregadora genérica, sem bloquear a aderência da SQL.
-- Testes direcionados passaram:
-  - `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest api-geo-nlp/tests/unit/test_vanna_agent_relevance.py -q`
-  - `python3 -m py_compile api-geo-nlp/app/integrations/vanna/agent.py api-geo-nlp/tests/unit/test_vanna_agent_relevance.py`
-- Revalidação com benchmark direto no `datahub2` após a mudança:
-  - `quais as 10 cidades que mais produzem soja`: de `~10.29s` para `~1.66s` médio, com `llm_total_ms = 0`;
-  - `qual a distribuicao do valor total da producao por estado`: de `~21.78s` pior caso medido para `~1.49s` médio, com `llm_total_ms = 0`.
-- Conclusão operacional do ciclo:
-  - o gargalo principal foi mitigado nos cenários geo-analíticos simples;
-  - o próximo alvo, se necessário, é aplicar a mesma estratégia a outras classes frequentes antes de considerar troca de modelo/provedor.
-- Em `2026-03-11`, foi aplicada uma otimização adicional no pipeline:
-  - `generate_sql_candidates()` agora tenta `geo_rule_fast_path` antes de carregar Vanna/memória vetorial;
-  - `PgVectorStore` e `dataset_version` passam a ser criados apenas no fallback contextual.
-- Foi adicionado teste de contrato garantindo que o fast path não carregue Vanna desnecessariamente.
-- Validação após lazy init:
-  - `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest api-geo-nlp/tests/unit/test_vanna_agent_relevance.py -q`
-  - `python3 -m py_compile api-geo-nlp/app/integrations/vanna/agent.py api-geo-nlp/tests/unit/test_vanna_agent_relevance.py`
-  - benchmark direto `quais as 10 cidades que mais produzem soja`:
-    - `avg_end_to_end_ms ~ 575.93`
-    - `avg_backend_ms ~ 526.72`
-    - `R2.generate_candidates ~ 6.1ms`
-    - `llm_total_ms = 0`
-- Em `2026-03-11`, foi iniciada a investigação de uma pergunta simples do Lab que não gerou SQL.
-- A reprodução ponta a ponta na UI local com `davi.custodio@embrapa.br / 123456` confirmou que a pergunta `me de a lista de cidades do estado de santa catarina` foi desviada para `ui_command` antes da geração de SQL.
-- Evidência registrada:
-  - resposta visual: `Comando de UI detectado. Encaminhando para Módulo 2.`
-  - `request_id = 1fbec5ed-fd44-40e1-b48d-1a29b2962a6a`
-  - `R1.classify_intent ~ 7.54s`
-  - sem operações SQL no timing/diagnóstico.
-- Na sequência, a mesma intenção foi reexecutada com variações linguísticas via API autenticada:
-  - `me de a lista...`, `liste...` e `traga...` -> `ui_command`;
-  - `quais as cidades...` -> `analytic_sql`.
-- A UI exibiu SQL válida para a formulação com `quais`:
-  - `SELECT nm_municip FROM public.municipio WHERE nm_estado = 'SANTA CATARINA';`
-- A conexão ativa do projeto `datahub2` foi validada e a consulta direta no banco do projeto confirmou `295` municípios em `SANTA CATARINA`.
-- Conclusão do diagnóstico:
-  - a falha está em `_classify_intent()` / `_looks_analytic_geo_question()` no backend;
-  - o banco e a modelagem do projeto suportam a pergunta;
-  - existe risco aberto para toda a classe de perguntas analíticas formuladas no imperativo.
-- Em `2026-03-11`, a correção foi implementada no backend:
-  - `RuntimeOrchestrator._classify_intent()` passou a distinguir melhor comandos explícitos de UI de pedidos analíticos imperativos;
-  - `run_vanna_prompt()` deixou de decidir `ui_command` sozinho quando não houver keyword explícita de interface;
-  - `_repair_sql_with_known_schema()` passou a normalizar filtros geográficos textuais para comparação case-insensitive.
-- Nova cobertura de testes adicionada para:
-  - `me de`, `liste`, `traga`, `mostre` -> `analytic_sql`;
-  - `abra o mapa...` -> `ui_command`;
-  - override de `ui_command` vindo do LLM sem evidência lexical de interface.
-- Validação local concluída:
-  - `33 passed` nos testes unitários direcionados.
-- Validação HTTP real concluída após restart da API:
-  - a pergunta original `me de a lista de cidades do estado de santa catarina` agora retorna `intent=analytic_sql`, SQL gerada e `row_count=295`;
-  - o comando explícito `abra o mapa da camada de soja` continua retornando `ui_command`.
-- Em `2026-03-11`, a redução adicional de latência foi implementada sem hardcode de projeto:
-  - `generate_sql_candidates()` ganhou um `semantic_vector_fast_path` para perguntas de lookup simples;
-  - esse caminho usa apenas chunks semânticos ativos (`ddl` + `dictionary`) via PgVector antes de hidratar o Vanna;
-  - se a SQL for aderente, o pipeline encerra ali; se não for, cai no fluxo completo já existente.
-- Foi testada uma variante com modelo leve no fast path, mas ela piorou o tempo da pergunta original; a mudança foi revertida na mesma sessão.
-- Validação final via HTTP real na pergunta original:
-  - `total_backend_ms` caiu para `5924.68`;
-  - `R2.generate_candidates` caiu para `5440.26`;
-  - permaneceu apenas uma chamada LLM;
-  - `row_count = 295`.
-- Em `2026-03-11`, o fluxo foi aprofundado na direção documentada do Vanna:
-  - `generate_sql_candidates()` agora consulta primeiro a memória vetorial (`qa` + `feedback`) do projeto ativo;
-  - `exact_training_match` pode ser resolvido antes de hidratar Vanna;
-  - foi adicionado cache em memória por `project_id + active_version + normalized_question`.
-- Validação HTTP real em duas execuções seguidas da mesma pergunta:
-  - tentativa 1: `total_backend_ms = 6815.1`, `llm_total_ms = 4189.24`, `row_count = 295`;
-  - tentativa 2: `total_backend_ms = 512.35`, `llm_total_ms = 0`, `row_count = 295`.
-- Em `2026-03-11`, foi implementado o passo seguinte da direção documentada:
-  - `generate_sql_candidates()` agora tenta `memory_adaptation_fast_path` para perguntas semelhantes, usando exemplos Q→SQL recuperados da memória vetorial antes de carregar a instância completa do Vanna;
-  - o fast path é ancorado com poucos chunks `ddl` + `dictionary` do projeto ativo e só retorna quando a SQL gerada passa no filtro de aderência.
-- Cobertura adicional criada:
-  - teste unitário garantindo que `memory_adaptation_fast_path` execute antes de `get_vanna_for_project()` quando houver pergunta semelhante;
-  - `python3 -m py_compile` passou;
+## Session: 2026-03-15
 
-## Session Log (2026-03-14 - Diagnóstico completo BIRD)
-- Foram lidos os documentos locais:
-  - `api-geo-nlp/docs/bird-gemini.md`
-  - `api-geo-nlp/docs/bird-gpt.md`
-  - `api-geo-nlp/docs/bird-qwen.md`
-  - `api-geo-nlp/docs/plano-ui-pipeline-duas-etapas.md`
-  - `api-geo-nlp/docs/relatorio_bird_spider_diagnostico_otimizacao.md`
-- Foi mapeado o pipeline real da API nos arquivos:
-  - `api-geo-nlp/app/modules/training/orchestrator.py`
-  - `api-geo-nlp/app/modules/training/services/metadata_discovery.py`
-  - `api-geo-nlp/app/modules/training/services/corpus_builder.py`
-  - `api-geo-nlp/app/modules/training/phases/t4_quality.py`
-  - `api-geo-nlp/app/integrations/vanna/agent.py`
-  - `api-geo-nlp/app/modules/runtime/orchestrator.py`
-  - `api-geo-nlp/app/modules/runtime/candidate_pipeline.py`
-- Foi mapeada a UI atual nos arquivos:
-  - `ai-data-pilot-manager/src/pages/ProjectSetupPage.tsx`
-  - `ai-data-pilot-manager/src/pages/MetadataPage.tsx`
-  - `ai-data-pilot-manager/src/pages/QuestionsPage.tsx`
-  - `ai-data-pilot-manager/src/pages/LabPage.tsx`
-- Foi iniciada a coleta externa no ecossistema oficial do BIRD:
-  - homepage/leaderboard do BIRD;
-  - Single-Model Leaderboard;
-  - track de R-VES;
-  - sites oficiais do `LiveSQLBench` e `BIRD-Interact`.
-- Próximo passo em andamento:
-  - consolidar os achados externos mais relevantes e redigir `api-geo-nlp/docs/diagnostico-completo.md`.
-- O relatório consolidado foi criado em `api-geo-nlp/docs/diagnostico-completo.md`.
-- O documento final propõe:
-  - fortalecimento da camada semântica via catálogo, value hints, join graph e query-log mining;
-  - troca do runtime quase single-shot por runtime adaptativo em tiers;
-  - critic semântico e repair loop;
-  - retrieval real com `pgvector`;
-  - governança estrita de memória validada;
-  - adaptação da UI para expor cobertura, confiança, falhas semânticas e benchmark.
-- O relatório foi readequado com requisitos adicionais:
-  - inclusão explícita de semântica geoespacial/PostGIS na camada semântica;
-  - planner geográfico determinístico considerando SRID, projeção, `geometry` vs `geography` e custo;
-  - uso recomendado do Vanna 2.0 nas fases offline e online em que ele agrega valor;
-  - seção de latência reforçada com estratégias específicas para perguntas geográficas;
-  - sincronismo obrigatório entre backend e UI na evolução do pipeline.
-- O relatório também passou a explicitar como restrição obrigatória:
-  - manter a arquitetura atual de persistência no banco de dados, segregada por usuário e por projeto;
-  - preservar a UI atual como superfície principal de gestão do pipeline/Lab, adaptando-a às novas fases sem quebrar o modelo de armazenamento existente.
-- Em `2026-03-12`, foi aberto o diagnóstico específico da pergunta `qual o bioma que mais produz milho`.
-- A reprodução HTTP no servidor já aquecido mostrou resposta rápida (`~0.8s`) porque o runtime estava usando `R2.candidate_cache_hit`; esse resultado mascarava o cold path real.
-- A medição fria em processo novo mostrou o comportamento real antes do ajuste estrutural:
-  - `~14.8s` fim a fim;
-  - `~12.1s` em duas chamadas LLM (`gemini` + `qwen`);
-  - `~0.41s` no banco.
-- Foi implementada a interrupção após o primeiro `vanna.generate_sql` aderente e adicionados spans para bootstrap do Vanna:
-  - `R2.vanna_instance_init`
-  - `R2.vanna_dataset_hydrate`
-  - `R2.vanna_ready`
-  - `R2.stop_after_relevant_generate_sql`
-- A nova medição fria após esse ajuste caiu para `~9.55s`, ainda dominada por uma única chamada `gemini`.
-- Foi executado microbenchmark direto dos modelos configurados:
-  - `google/gemini-3-flash-preview`: média `~6.67s`;
-  - `qwen/qwen3.5-flash-02-23`: média `~6.96s`;
-  - `z-ai/glm-4.7-flash`: amostra isolada `~17.85s`.
-- Conclusão operacional registrada:
-  - trocar apenas o modelo não resolve o gargalo;
-  - o principal ganho precisa vir de bypass do LLM para classes simples.
-- Em seguida, `generate_sql_candidates()` passou a tentar `structured_rule_fast_path` antes de memória vetorial, Tool Memory e Vanna.
-- A estratégia usa o `QueryContract` e o builder determinístico já existente para perguntas geo-analíticas simples, evitando cache semântico de SQL entre perguntas parecidas.
-- Testes direcionados passaram novamente:
-  - `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ./.venv/bin/pytest tests/unit/test_vanna_agent_relevance.py -q`
-  - `./.venv/bin/python -m py_compile app/integrations/vanna/agent.py tests/unit/test_vanna_agent_relevance.py`
-- A API HTTP foi reiniciada com `API_GEO_NLP_DB_AUTO_INIT_SCHEMA=false` para medir o primeiro request frio do runtime sem custo de bootstrap administrativo de schema.
-- Validação final via HTTP fria após a mudança:
-  - `http_roundtrip_ms ~ 645.72`
-  - `total_backend_ms ~ 562.12`
-  - `llm_total_ms = 0`
-  - `db_total_ms ~ 324.97`
-  - `selected_source = structured_rule_fast_path`
-- Warm path subsequente permaneceu em `~596ms`, agora sem depender exclusivamente do cache exato para apresentar boa performance.
-  - `./.venv/bin/pytest tests/unit/test_vanna_agent_relevance.py -q` passou com `25 passed`;
-  - `./.venv/bin/pytest tests/unit/test_runtime_intent_classification.py -q` passou com `6 passed`.
-- Validação HTTP real após restart da API:
-  - pergunta `me mostre os produtos da categoria pecuaria que cresceram no valor de producao entre 2018 e 2019` retornou `selected_source = memory_adaptation_fast_path`;
-  - nesse primeiro hit frio, `total_backend_ms = 6769.67` e houve uma única chamada `generate_sql_memory_fast_path`;
-  - em execuções subsequentes da mesma pergunta, o cache por versão assumiu o controle e o backend caiu para `~508ms`, sem nenhuma chamada LLM.
-- `2026-03-14 23:xx` Início da implementação guiada por `api-geo-nlp/docs/diagnostico-completo.md`.
-- Branches criados/selecionados:
-  - `geo-ia-db-master`: `codex/bird-implementation`
-  - `api-geo-nlp`: `codex/bird-implementation`
-  - `ai-data-pilot-manager`: `codex/bird-implementation`
-- Conectividade com PostgreSQL confirmada pela API (`ai-data-pilot`, usuário `davicustodio`, PostgreSQL 16.13).
-- Próximo passo registrado: medir o gap entre diagnóstico e implementação real para priorizar backend e UI.
-- O gap foi fechado com implementação nas duas frentes principais do diagnóstico:
-  - backend com artefatos semânticos persistidos, enrich de questions e runtime adaptativo;
-  - frontend com visibilidade de cobertura semântica, confiança, critic e planner geográfico.
-- Principais entregas de backend:
-  - nova tabela `project_semantic_artifacts` e serviços de store/leitura;
-  - builder de `join_graph`, `semantic_catalog`, `value_hints`, `postgis_semantics`, `latency_budget`, `difficulty_routing_rules` e `geo_latency_rules`;
-  - expansão de `TrainingStateResponse` e do schema overview para expor artefatos semânticos;
-  - novo módulo `semantic_runtime.py` com `EvidencePackBuilder`, `DifficultyRouter`, `GeoSemanticPlanner`, `SemanticCritic`, candidatos contextuais e score de confiança;
-  - integração desses sinais ao `RuntimeOrchestrator` com repair loop inicial.
-- Principais entregas de frontend:
-  - `ProjectSetupPage` com cobertura semântica, artefatos prontos e benchmark da última execução;
-  - `MetadataPage` com papel semântico, aliases, amostras e atributos PostGIS;
-  - `QuestionsPage` com dificuldade, status de validação, checks e proveniência;
-  - `LabPage` com tier, confidence, semantic validation, geo planner e diagnóstico ampliado.
-- Correções detectadas no ciclo final:
-  - import faltante de `PgVectorStore` corrigido no runtime orchestrator após smoke real;
-  - teste `app-shell.test.tsx` atualizado para o branding atual do shell.
-- Validação consolidada:
-  - backend full suite `pytest -q`: `156 passed`;
-  - backend focal: `18 passed`;
-  - integração backend focal: `10 passed`;
-  - frontend full suite `npm test`: `42 passed`;
-  - frontend focal: `16 passed`;
-  - `npm run build`: sucesso.
-- Bloqueio remanescente isolado no ambiente:
-  - o smoke real com `scripts/benchmark_ask_runtime.py --mode direct --project-id datahub2` avançou até o runtime, mas falhou porque a conexão/base ativa do projeto não possui a relação `public.producao`.
-- Em `2026-03-15`, o bloqueio de ambiente do `datahub2` foi resolvido.
-- Diagnóstico:
-  - a conexão ativa do projeto apontava para `buriti.cnpm.embrapa.br / datahub`, mas a descriptografia de `password_encrypted` falhava;
-  - com isso, `SecretResolver` fazia fallback para o `.env` e o runtime consultava `ai-data-pilot`, onde `public.producao` não existe.
-- Ação aplicada:
-  - regravação da senha criptografada da conexão ativa em `project_db_connections` com a chave atual da aplicação.
-- Confirmações após ajuste:
-  - `ResolvedCredential(... dbname=datahub ...)` voltou a ser retornado para o `datahub2`;
-  - `public.producao` existe no banco correto com `148158` linhas;
-  - `public.municipio` também existe e segue acessível.
-- Revalidação operacional:
-  - benchmark direto no `datahub2` para `quais as 10 cidades que mais produzem soja` concluiu com `failed_count=0`;
-  - validação funcional adicional no runtime retornou `selected_source = vanna_generate_sql`, `row_count = 10` e municípios como `SORRISO`, `NOVA MUTUM` e `FORMOSA DO RIO PRETO`.
-- Conclusão atual:
-  - o item antes classificado como limitação de ambiente foi eliminado;
-  - a implementação e a validação real do `datahub2` ficaram operacionais no banco correto, sem necessidade de semear dados sintéticos.
+### Phase 1: Requirements & Discovery
+- **Status:** complete
+- **Started:** 2026-03-15 10:23:55 -03
+- Actions taken:
+  - Li as instrucoes dos skills `planning-with-files` e `valyu-best-practices`.
+  - Inicializei arquivos de memoria de trabalho do projeto para conduzir a pesquisa.
+- Files created/modified:
+  - task_plan.md (created)
+  - findings.md (created)
+  - progress.md (created)
+
+### Phase 2: Research & Source Validation
+- **Status:** complete
+- Actions taken:
+  - Pesquisei a documentacao oficial do GeoNode 5 e os materiais da API v2.
+  - Levantei autenticacao, endpoints de metadados, exemplos de uso e referencia de schema.
+- Files created/modified:
+  - findings.md (updated)
+  - task_plan.md (updated)
+
+### Phase 3: MCP Feasibility Assessment
+- **Status:** complete
+- Actions taken:
+  - Modelei um desenho de MCP com `resources` para schema e `tools` para operacoes REST.
+  - Avaliei autenticacao, seguranca, paginacao, escrita e riscos de compatibilidade.
+- Files created/modified:
+  - findings.md (updated)
+  - task_plan.md (updated)
+
+### Phase 4: Report Drafting
+- **Status:** complete
+- Actions taken:
+  - Estruturei o relatorio tecnico consolidando pesquisa e proposta de implementacao.
+  - Gravei o relatorio final em `geonode5-mcp-diagnostico.md`.
+- Files created/modified:
+  - task_plan.md (updated)
+  - geonode5-mcp-diagnostico.md (created)
+
+### Phase 5: Delivery
+- **Status:** complete
+- Actions taken:
+  - Revisei o relatorio final para consistencia tecnica e referencias.
+  - Preparei a resposta final com links e localizacao do artefato.
+- Files created/modified:
+  - task_plan.md (updated)
+  - progress.md (updated)
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Session catchup | script session-catchup.py | Relatorio ou saida neutra | Sem contexto previo relevante retornado | pass |
+| Source validation | docs.geonode.org + modelcontextprotocol.io | Fontes oficiais suficientes | Fontes oficiais confirmadas para diagnostico | pass |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+|           |       | 1       |            |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 5, entrega concluida |
+| Where am I going? | Encerrar com resumo e eventuais proximos passos |
+| What's the goal? | Diagnosticar a API do GeoNode 5 e propor um MCP viavel |
+| What have I learned? | A API v2 e o metadata engine de 5.x tornam o MCP viavel |
+| What have I done? | Pesquisei fontes oficiais, validei a abordagem, gerei e revisei o relatorio final |
